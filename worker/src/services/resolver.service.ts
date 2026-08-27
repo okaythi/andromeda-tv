@@ -1,5 +1,5 @@
 export class ResolverService {
-  constructor(private readonly geekToken: string) {}
+  // constructor() {}
 
   public resolveLink(internalId: string): string {
     // In a full implementation, this mirrors the Python resolve_vod_link logic.

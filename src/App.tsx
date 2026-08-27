@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Home, Compass, Users, User, Search, Mic, Bell, Play, Plus, Eye } from 'lucide-react';
-import { fetchMovies, fetchChannels, Movie, LiveStream } from './api/backend';
+import { fetchMovies, fetchChannels, type Movie, type LiveStream } from './api/backend';
 
 function App() {
   const [movies, setMovies] = useState<Movie[]>([]);
@@ -126,7 +126,7 @@ function App() {
                 <div key={ch.id + i} className="min-w-[280px] group cursor-pointer">
                   <div className="w-full h-[160px] rounded-2xl overflow-hidden relative mb-3">
                     <img 
-                      src={ch.logoUrl || \`https://images.unsplash.com/photo-1541873676-a18131494184?q=80&w=600&auto=format&fit=crop&sig=\${i}\`} 
+                      src={ch.logoUrl || `https://images.unsplash.com/photo-1541873676-a18131494184?q=80&w=600&auto=format&fit=crop&sig=${i}`} 
                       alt="Thumbnail" 
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
@@ -158,7 +158,7 @@ function App() {
                 {displayMovies.slice(1).map((m, i) => (
                   <div key={m.id + i} className="min-w-[200px] h-[300px] rounded-2xl overflow-hidden relative cursor-pointer group">
                     <img 
-                      src={m.posterUrl || \`https://images.unsplash.com/photo-1618172193622-ae2d025f4032?q=80&w=400&auto=format&fit=crop&sig=\${i+10}\`} 
+                      src={m.posterUrl || `https://images.unsplash.com/photo-1618172193622-ae2d025f4032?q=80&w=400&auto=format&fit=crop&sig=${i+10}`} 
                       alt="Curated" 
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />

@@ -25,7 +25,7 @@ app.route('/api/live', liveRouter);
 export default {
   fetch: app.fetch,
 
-  async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
+  async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
     const db = drizzle(env.DB);
     const tmdbService = new TMDBService(env.TMDB_READ_ACCESS_TOKEN);
     const syncService = new SyncService(db, tmdbService);

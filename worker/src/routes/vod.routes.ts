@@ -2,7 +2,6 @@ import { Hono } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
 import { Env } from '../types';
 import { movies, series } from '../schema';
-import { desc, limit, offset } from 'drizzle-orm';
 
 const vodRouter = new Hono<{ Bindings: Env }>();
 

@@ -1,7 +1,7 @@
 import { DrizzleD1Database } from 'drizzle-orm/d1';
-import { movies, series, channels, events } from '../schema';
+import { movies } from '../schema';
 import { TMDBService } from './tmdb.service';
-import { RawMovieSchema, RawSeriesSchema } from '../schemas/vod.schema';
+import { RawMovieSchema } from '../schemas/vod.schema';
 
 export class SyncService {
   constructor(
@@ -34,8 +34,8 @@ export class SyncService {
         internalId: movie.internal_id,
         title: movie.name,
         overview: tmdbData?.overview || movie.info || '',
-        posterUrl: tmdbData?.poster_path ? \`https://image.tmdb.org/t/p/w500\${tmdbData.poster_path}\` : movie.thumb || '',
-        backdropUrl: tmdbData?.backdrop_path ? \`https://image.tmdb.org/t/p/w1280\${tmdbData.backdrop_path}\` : movie.fanart || '',
+        posterUrl: tmdbData?.poster_path ? `https://image.tmdb.org/t/p/w500${tmdbData.poster_path}` : movie.thumb || '',
+        backdropUrl: tmdbData?.backdrop_path ? `https://image.tmdb.org/t/p/w1280${tmdbData.backdrop_path}` : movie.fanart || '',
         rating: tmdbData?.vote_average?.toString() || '0',
         tmdbId: tmdbData?.id || null,
         category: movie.category || 'Movies'
@@ -45,8 +45,8 @@ export class SyncService {
           internalId: movie.internal_id,
           title: movie.name,
           overview: tmdbData?.overview || movie.info || '',
-          posterUrl: tmdbData?.poster_path ? \`https://image.tmdb.org/t/p/w500\${tmdbData.poster_path}\` : movie.thumb || '',
-          backdropUrl: tmdbData?.backdrop_path ? \`https://image.tmdb.org/t/p/w1280\${tmdbData.backdrop_path}\` : movie.fanart || '',
+          posterUrl: tmdbData?.poster_path ? `https://image.tmdb.org/t/p/w500${tmdbData.poster_path}` : movie.thumb || '',
+          backdropUrl: tmdbData?.backdrop_path ? `https://image.tmdb.org/t/p/w1280${tmdbData.backdrop_path}` : movie.fanart || '',
           rating: tmdbData?.vote_average?.toString() || '0'
         }
       });

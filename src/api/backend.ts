@@ -27,7 +27,7 @@ const BACKEND_URL = 'http://127.0.0.1:8787';
 
 export const fetchMovies = async (page = 1, limit = 50): Promise<Movie[]> => {
   try {
-    const res = await fetch(\`\${BACKEND_URL}/api/vod/movies?page=\${page}&limit=\${limit}\`);
+    const res = await fetch(`${BACKEND_URL}/api/vod/movies?page=${page}&limit=${limit}`);
     if (!res.ok) return [];
     const data = await res.json();
     return data.movies || [];
@@ -38,7 +38,7 @@ export const fetchMovies = async (page = 1, limit = 50): Promise<Movie[]> => {
 
 export const fetchChannels = async (): Promise<LiveStream[]> => {
   try {
-    const res = await fetch(\`\${BACKEND_URL}/api/live/channels\`);
+    const res = await fetch(`${BACKEND_URL}/api/live/channels`);
     if (!res.ok) return [];
     const data = await res.json();
     return data.channels || [];

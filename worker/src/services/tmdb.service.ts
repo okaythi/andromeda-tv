@@ -18,12 +18,12 @@ export class TMDBService {
   constructor(private readonly readAccessToken: string) {}
 
   private async fetchTMDB(endpoint: string, queryParams: URLSearchParams): Promise<z.infer<typeof TMDBResponseSchema> | null> {
-    const url = \`https://api.themoviedb.org/3\${endpoint}?\${queryParams.toString()}\`;
+    const url = `https://api.themoviedb.org/3${endpoint}?${queryParams.toString()}`;
     
     try {
       const response = await fetch(url, {
         headers: {
-          'Authorization': \`Bearer \${this.readAccessToken}\`,
+          'Authorization': `Bearer ${this.readAccessToken}`,
           'Accept': 'application/json'
         }
       });
