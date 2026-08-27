@@ -1,8 +1,27 @@
 import { Hono } from 'hono';
 import { db } from '../db';
 import { movies, series } from '../schema';
+import { eq } from 'drizzle-orm';
 
 const vodRouter = new Hono();
+
+vodRouter.get('/home', async (c) => {
+  // Fetch a mix of categories to populate the home page carousels
+  const lancamentos = await db.select().from(movies).where(eq(movies.category, 'Lançamentos')).limit(20);
+  const filmes = await db.select().from(movies).where(eq(movies.category, 'Filmes')).limit(20);
+  const populares = await db.select().from(movies).limit(20);
+  
+  const popularSeries = await db.select().from(series).where(eq(series.category, 'Séries')).limit(20);
+  const animes = await db.select().from(series).where(eq(series.category, 'Animes')).limit(20);
+  const doramas = await db.select().from(series).where(eq(series.category, 'Doramas')).limit(20);
+
+  return c.json({
+    popular_movies: [...lancamentos, ...filmes, ...populares],
+    popular_series: popularSeries,
+    animes: animes,
+    doramas: doramas,
+  });
+});
 
 vodRouter.get('/movies', async (c) => {
   const page = Number(c.req.query('page')) || 1;

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { fetchMovies, fetchChannels, type Movie, type LiveStream } from './api/backend';
+import { fetchHome, fetchChannels, type Movie, type LiveStream } from './api/backend';
 import { Sidebar, type ViewType } from './components/Sidebar';
 import { HomeView } from './views/HomeView';
 import { ChannelsGrid } from './views/ChannelsGrid';
@@ -10,7 +10,18 @@ function App() {
   const [currentView, setCurrentView] = useState<ViewType>('home');
 
   useEffect(() => {
-    fetchMovies(1, 10).then(setMovies);
+    fetchHome().then(data => {
+      // Flatten the categories so HomeView's groupBy can recreate them, 
+      // or we can change HomeView to accept the categorized data directly.
+      // For now, flatten it so HomeView works without changes:
+      const allMixed = [
+        ...data.popular_movies, 
+        ...data.popular_series, 
+        ...data.animes, 
+        ...data.doramas
+      ];
+      setMovies(allMixed);
+    });
     fetchChannels().then(setChannels);
   }, []);
 

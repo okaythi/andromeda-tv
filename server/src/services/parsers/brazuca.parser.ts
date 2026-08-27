@@ -109,7 +109,7 @@ export class BrazucaParser {
     return out;
   }
 
-  public async fetchVod(url: string, category: string, contentType: string, startId: number = 0): Promise<ParsedItem[]> {
+  public async fetchVod(url: string, category: string, contentType: string, idPrefix: string = 'vod_'): Promise<ParsedItem[]> {
     const itemsOut: ParsedItem[] = [];
     try {
       const resp = await fetch(url);
@@ -148,7 +148,7 @@ export class BrazucaParser {
         }
 
         const parsed = ParsedItemSchema.safeParse({
-          id: `vod_${startId + itemsOut.length + 1}`,
+          id: `${idPrefix}${itemsOut.length + 1}`,
           name: rawName,
           thumb: thumbVal,
           fanart: fanartVal,

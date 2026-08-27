@@ -33,11 +33,11 @@ export class SyncService {
         animesRes, doramasRes, seriesRes, opVodRes
       ] = await Promise.allSettled([
         this.brazuca.fetchChannels(`${gistBase}channels.xml`),
-        this.brazuca.fetchVod(`${moviesGist}lancamentos.xml`, 'Lançamentos', 'movie', 0),
-        this.brazuca.fetchVod(`${moviesGist}page.xml`, 'Filmes', 'movie', 1000),
-        this.brazuca.fetchVod(`${gistBase}AnimesBase`, 'Animes', 'tv', 0),
-        this.brazuca.fetchVod(`${gistBase}DoramasBase`, 'Doramas', 'tv', 0),
-        this.brazuca.fetchVod(`${gistBase}SeriesBase`, 'Séries', 'tv', 0),
+        this.brazuca.fetchVod(`${moviesGist}lancamentos.xml`, 'Lançamentos', 'movie', 'lan_'),
+        this.brazuca.fetchVod(`${moviesGist}page.xml`, 'Filmes', 'movie', 'fil_'),
+        this.brazuca.fetchVod(`${gistBase}AnimesBase`, 'Animes', 'tv', 'ani_'),
+        this.brazuca.fetchVod(`${gistBase}DoramasBase`, 'Doramas', 'tv', 'dor_'),
+        this.brazuca.fetchVod(`${gistBase}SeriesBase`, 'Séries', 'tv', 'ser_'),
         this.oneplay.fetchVod(accounts)
       ]);
 

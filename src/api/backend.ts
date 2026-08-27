@@ -23,6 +23,17 @@ export interface LiveStream {
 
 const BACKEND_URL = 'https://andromeda.nixlabs.tech';
 
+export const fetchHome = async () => {
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/vod/home`);
+    if (!res.ok) return { popular_movies: [], popular_series: [], animes: [], doramas: [] };
+    const data = await res.json();
+    return data;
+  } catch {
+    return { popular_movies: [], popular_series: [], animes: [], doramas: [] };
+  }
+};
+
 export const fetchMovies = async (page = 1, limit = 50): Promise<Movie[]> => {
   try {
     const res = await fetch(`${BACKEND_URL}/api/vod/movies?page=${page}&limit=${limit}`);
