@@ -14,7 +14,7 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
     if (this.state.hasError) {
       return (
         <div style={{ padding: 20, color: 'red', background: '#222', minHeight: '100vh' }}>
-          <h1>React Runtime Error:</h1>
+          <h1>Erro de Execução do React:</h1>
           <pre>{String(this.state.error?.stack || this.state.error)}</pre>
         </div>
       );
