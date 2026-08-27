@@ -1,161 +1,198 @@
+import { sql, eq, isNull } from 'drizzle-orm';
 import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
-import { movies, series, channels } from '../schema';
+import { channels, movies, series } from '../schema';
 import * as schema from '../schema';
 import { TMDBService } from './tmdb.service';
 import { BrazucaParser } from './parsers/brazuca.parser';
 import { OnePlayParser } from './parsers/oneplay.parser';
 
+const GIST_BASE = 'https://gist.githubusercontent.com/skyrisk/16070347f20c87c72540f9f805b57a66/raw/';
+const MOVIES_GIST = 'https://gist.githubusercontent.com/skyrisk/5b87797329c7b46422565ffbaab3be7e/raw/';
+
+const BRAZUCA_FEEDS = [
+  { url: `${MOVIES_GIST}lancamentos.xml`, category: 'Lançamentos', type: 'movie', prefix: 'lan_' },
+  { url: `${MOVIES_GIST}page.xml`, category: 'Filmes', type: 'movie', prefix: 'fil_' },
+  { url: `${GIST_BASE}AnimesBase`, category: 'Animes', type: 'tv', prefix: 'ani_' },
+  { url: `${GIST_BASE}DoramasBase`, category: 'Doramas', type: 'tv', prefix: 'dor_' },
+  { url: `${GIST_BASE}SeriesBase`, category: 'Séries', type: 'tv', prefix: 'ser_' },
+] as const;
+
 export class SyncService {
-  private brazuca = new BrazucaParser();
-  private oneplay = new OnePlayParser();
   private isSyncing = false;
+  private isEnriching = false;
 
   constructor(
     private readonly db: BetterSQLite3Database<typeof schema>,
-    private readonly tmdb: TMDBService
+    private readonly tmdb: TMDBService,
+    private readonly brazuca = new BrazucaParser(),
+    private readonly oneplay = new OnePlayParser()
   ) {}
 
   public async runGlobalSync(): Promise<void> {
     if (this.isSyncing) return;
     this.isSyncing = true;
-    console.log('Starting global background sync...');
 
     try {
-      // 1. Fetch OnePlay Accounts
-      const accounts = await this.oneplay.syncOnePlayAccounts();
-
-      // 2. Parallel Fetch All XMLs & APIs
-      const gistBase = "https://gist.githubusercontent.com/skyrisk/16070347f20c87c72540f9f805b57a66/raw/";
-      const moviesGist = "https://gist.githubusercontent.com/skyrisk/5b87797329c7b46422565ffbaab3be7e/raw/";
-
-      console.log('Fetching catalogs...');
-      const [
-        chRes, lancamentosRes, pageRes,
-        animesRes, doramasRes, seriesRes, opVodRes
-      ] = await Promise.allSettled([
-        this.brazuca.fetchChannels(`${gistBase}channels.xml`),
-        this.brazuca.fetchVod(`${moviesGist}lancamentos.xml`, 'Lançamentos', 'movie', 'lan_'),
-        this.brazuca.fetchVod(`${moviesGist}page.xml`, 'Filmes', 'movie', 'fil_'),
-        this.brazuca.fetchVod(`${gistBase}AnimesBase`, 'Animes', 'tv', 'ani_'),
-        this.brazuca.fetchVod(`${gistBase}DoramasBase`, 'Doramas', 'tv', 'dor_'),
-        this.brazuca.fetchVod(`${gistBase}SeriesBase`, 'Séries', 'tv', 'ser_'),
-        this.oneplay.fetchVod(accounts)
+      const [accounts, brazucaChannels, vodCatalogs] = await Promise.all([
+        this.oneplay.syncOnePlayAccounts(),
+        this.brazuca.fetchChannels(`${GIST_BASE}channels.xml`),
+        Promise.all(BRAZUCA_FEEDS.map(f => this.brazuca.fetchVod(f.url, f.category, f.type, f.prefix))),
       ]);
 
-      const rawChannels = chRes.status === 'fulfilled' ? chRes.value : [];
-      const lancamentos = lancamentosRes.status === 'fulfilled' ? lancamentosRes.value : [];
-      const filmes = pageRes.status === 'fulfilled' ? pageRes.value : [];
-      const animes = animesRes.status === 'fulfilled' ? animesRes.value : [];
-      const doramas = doramasRes.status === 'fulfilled' ? doramasRes.value : [];
-      const brazucaSeries = seriesRes.status === 'fulfilled' ? seriesRes.value : [];
-      const { movies: opMovies, series: opSeries } = opVodRes.status === 'fulfilled' ? opVodRes.value : { movies: [], series: [] };
+      const onePlayVod = await this.oneplay.fetchVod(accounts);
 
-      // 3. Insert Channels
-      console.log(`Inserting ${rawChannels.length} channels...`);
-      if (rawChannels.length > 0) {
-        const channelsToInsert = rawChannels.map(ch => ({
-          id: ch.id,
-          internalId: ch.internalId,
-          name: ch.name,
-          logoUrl: ch.thumb,
-          category: ch.category,
-          source: 'Brazuca',
-          links: JSON.stringify([{ url: ch.internalId, ua: 'XC-IPTV' }])
-        }));
-        
-        // SQLite bulk insert
-        await this.db.insert(channels).values(channelsToInsert).onConflictDoUpdate({
-          target: channels.id,
-          set: {
-            internalId: channelsToInsert[0].internalId, // SQLite onConflict requires specific syntax or loop for bulk upsert, but drizzle supports it if handled carefully
-            // Workaround for SQLite bulk upsert with Drizzle:
-            // Since SQLite doesn't natively support dynamic sets easily in batch, we can just insert one by one inside a transaction.
-            // But better-sqlite3 is incredibly fast anyway.
-          }
-        }).execute().catch(async () => {
-           // Fallback to loop if bulk upsert fails due to Drizzle SQLite limits
-           const stmt = this.db.insert(channels).values({
-             id: '', internalId: '', name: '', logoUrl: '', category: '', source: '', links: ''
-           }).onConflictDoUpdate({
-             target: channels.id,
-             set: {
-               internalId: '', name: '', logoUrl: '', category: ''
-             }
-           });
-           
-           for (const ch of channelsToInsert) {
-             await this.db.insert(channels).values(ch).onConflictDoUpdate({
-               target: channels.id,
-               set: {
-                 internalId: ch.internalId,
-                 name: ch.name,
-                 logoUrl: ch.logoUrl,
-                 category: ch.category
-               }
-             }).execute();
-           }
-        });
-      }
+      const [lancamentos = [], filmes = [], animes = [], doramas = [], brazucaSeries = []] = vodCatalogs;
+      const allMovies = [...lancamentos, ...filmes, ...onePlayVod.movies];
+      const allSeries = [...animes, ...doramas, ...brazucaSeries, ...onePlayVod.series];
 
-      // 4. Insert Movies (Lancamentos + Filmes + OnePlay Movies)
-      const allMovies = [...lancamentos, ...filmes, ...opMovies];
-      console.log(`Processing ${allMovies.length} movies...`);
-      for (const movie of allMovies) {
-        await this.db.insert(movies).values({
-          id: movie.id,
-          internalId: movie.internalId,
-          title: movie.name,
-          overview: movie.info || '',
-          posterUrl: movie.thumb || '',
-          backdropUrl: movie.fanart || '',
-          rating: '0',
-          tmdbId: null,
-          category: movie.category || 'Movies'
-        }).onConflictDoUpdate({
-          target: movies.id,
-          set: {
-            internalId: movie.internalId,
-            title: movie.name,
-            overview: movie.info || '',
-            posterUrl: movie.thumb || '',
-            backdropUrl: movie.fanart || '',
-            category: movie.category // FIX: ensure category is updated!
-          }
-        }).execute();
-      }
-
-      // 5. Insert Series
-      const allSeries = [...animes, ...doramas, ...brazucaSeries, ...opSeries];
-      console.log(`Processing ${allSeries.length} series...`);
-      for (const s of allSeries) {
-        await this.db.insert(series).values({
-          id: s.id,
-          internalId: s.internalId,
-          title: s.name,
-          overview: s.info || '',
-          posterUrl: s.thumb || '',
-          backdropUrl: s.fanart || '',
-          rating: '0',
-          tmdbId: null,
-          category: s.category || 'Series'
-        }).onConflictDoUpdate({
-          target: series.id,
-          set: {
-            internalId: s.internalId,
-            title: s.name,
-            overview: s.info || '',
-            posterUrl: s.thumb || '',
-            backdropUrl: s.fanart || '',
-            category: s.category // FIX: ensure category is updated!
-          }
-        }).execute();
-      }
-
-      console.log('Global sync completed successfully.');
-    } catch (e) {
-      console.error('Error during global sync', e);
+      this.db.transaction(() => {
+        this.upsertChannels(brazucaChannels);
+        this.upsertMovies(allMovies);
+        this.upsertSeries(allSeries);
+      });
+      
+      console.log(`Global sync completed: ${brazucaChannels.length} channels, ${allMovies.length} movies, ${allSeries.length} series.`);
+    } catch (error) {
+      console.error('[SyncService] Global sync failed:', error);
     } finally {
       this.isSyncing = false;
+    }
+  }
+
+  public async runTMDBEnrichment(batchSize = 50): Promise<void> {
+    if (this.isEnriching) return;
+    this.isEnriching = true;
+
+    try {
+      const pendingMovies = await this.db.select().from(movies).where(isNull(movies.tmdbId)).limit(batchSize);
+      
+      for (const m of pendingMovies) {
+        // Sleep to avoid TMDB rate limits (approx 40-50 req/sec allowed, but play it safe)
+        await new Promise(resolve => setTimeout(resolve, 100));
+        const data = await this.tmdb.searchMovie(m.title);
+        
+        await this.db.update(movies)
+          .set({
+            tmdbId: data?.id ?? -1, // -1 denotes 'not found', preventing infinite retries
+            overview: data?.overview || m.overview,
+            posterUrl: data?.poster_path ? `https://image.tmdb.org/t/p/w500${data.poster_path}` : m.posterUrl,
+            backdropUrl: data?.backdrop_path ? `https://image.tmdb.org/t/p/w1280${data.backdrop_path}` : m.backdropUrl,
+            rating: data?.vote_average?.toString() || m.rating
+          })
+          .where(eq(movies.id, m.id))
+          .run();
+      }
+
+      const pendingSeries = await this.db.select().from(series).where(isNull(series.tmdbId)).limit(batchSize);
+      
+      for (const s of pendingSeries) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        const data = await this.tmdb.searchSeries(s.title);
+        
+        await this.db.update(series)
+          .set({
+            tmdbId: data?.id ?? -1, 
+            overview: data?.overview || s.overview,
+            posterUrl: data?.poster_path ? `https://image.tmdb.org/t/p/w500${data.poster_path}` : s.posterUrl,
+            backdropUrl: data?.backdrop_path ? `https://image.tmdb.org/t/p/w1280${data.backdrop_path}` : s.backdropUrl,
+            rating: data?.vote_average?.toString() || s.rating
+          })
+          .where(eq(series.id, s.id))
+          .run();
+      }
+      
+      if (pendingMovies.length > 0 || pendingSeries.length > 0) {
+        console.log(`[TMDB] Enriched ${pendingMovies.length} movies and ${pendingSeries.length} series.`);
+      }
+    } catch (error) {
+      console.error('[SyncService] TMDB Enrichment failed:', error);
+    } finally {
+      this.isEnriching = false;
+    }
+  }
+
+  private upsertChannels(rawChannels: Awaited<ReturnType<BrazucaParser['fetchChannels']>>): void {
+    if (!rawChannels.length) return;
+
+    const rows = rawChannels.map(ch => ({
+      id: ch.id,
+      internalId: ch.internalId,
+      name: ch.name,
+      logoUrl: ch.thumb,
+      category: ch.category,
+      source: 'Brazuca',
+      links: JSON.stringify([{ url: ch.internalId, ua: 'XC-IPTV' }]),
+    }));
+
+    this.batchInsert(channels, rows, {
+      internalId: sql`excluded.internal_id`,
+      name: sql`excluded.name`,
+      logoUrl: sql`excluded.logo_url`,
+      category: sql`excluded.category`,
+    });
+  }
+
+  private upsertMovies(rawMovies: Array<{ id: string; internalId: string; name: string; info?: string; thumb?: string; fanart?: string; category?: string }>): void {
+    if (!rawMovies.length) return;
+
+    const rows = rawMovies.map(m => ({
+      id: m.id,
+      internalId: m.internalId,
+      title: m.name,
+      overview: m.info ?? '',
+      posterUrl: m.thumb ?? '',
+      backdropUrl: m.fanart ?? '',
+      rating: '0',
+      tmdbId: null, // Keep null to signify pending TMDB enrichment
+      category: m.category ?? 'Movies',
+    }));
+
+    this.batchInsert(movies, rows, {
+      internalId: sql`excluded.internal_id`,
+      title: sql`excluded.title`,
+      category: sql`excluded.category`,
+      // Intentionally omitting TMDB fields from onConflictDoUpdate so we don't overwrite enriched data on next sync
+    });
+  }
+
+  private upsertSeries(rawSeries: Array<{ id: string; internalId: string; name: string; info?: string; thumb?: string; fanart?: string; category?: string }>): void {
+    if (!rawSeries.length) return;
+
+    const rows = rawSeries.map(s => ({
+      id: s.id,
+      internalId: s.internalId,
+      title: s.name,
+      overview: s.info ?? '',
+      posterUrl: s.thumb ?? '',
+      backdropUrl: s.fanart ?? '',
+      rating: '0',
+      tmdbId: null,
+      category: s.category ?? 'Series',
+    }));
+
+    this.batchInsert(series, rows, {
+      internalId: sql`excluded.internal_id`,
+      title: sql`excluded.title`,
+      category: sql`excluded.category`,
+    });
+  }
+
+  private batchInsert<TTable extends typeof channels | typeof movies | typeof series>(
+    table: TTable,
+    rows: any[],
+    conflictSet: Record<string, any>,
+    chunkSize = 250
+  ): void {
+    for (let i = 0; i < rows.length; i += chunkSize) {
+      const chunk = rows.slice(i, i + chunkSize);
+      this.db
+        .insert(table)
+        .values(chunk)
+        .onConflictDoUpdate({
+          target: (table as any).id,
+          set: conflictSet,
+        })
+        .run(); // .run() for better-sqlite3
     }
   }
 }

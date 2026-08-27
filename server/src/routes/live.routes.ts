@@ -5,7 +5,6 @@ import { channels, events } from '../schema';
 const liveRouter = new Hono();
 
 liveRouter.get('/channels', async (c) => {
-  const page = Number(c.req.query('page')) || 1;
   const results = await db.select().from(channels);
     
   return c.json({

@@ -23,7 +23,7 @@ app.get('/api/health', (c) => c.json({ status: 'online' }));
 app.route('/api/vod', vodRouter);
 app.route('/api/live', liveRouter);
 
-const port = process.env.PORT ? parseInt(process.env.PORT) : 3000;
+const port = process.env['PORT'] ? parseInt(process.env['PORT']) : 3000;
 console.log(`Server is running on port ${port}`);
 
 serve({
@@ -32,14 +32,22 @@ serve({
 });
 
 // Background sync
-const tmdbService = new TMDBService(process.env.TMDB_READ_ACCESS_TOKEN || '');
+const tmdbService = new TMDBService(process.env['TMDB_READ_ACCESS_TOKEN'] || '');
 const syncService = new SyncService(db, tmdbService);
 
 console.log('Running initial sync...');
-syncService.runGlobalSync().catch(e => console.error('Initial sync error', e));
+syncService.runGlobalSync().then(() => {
+  console.log('Initial sync finished. Starting enrichment...');
+  syncService.runTMDBEnrichment(100).catch(e => console.error('Initial enrichment error', e));
+}).catch(e => console.error('Initial sync error', e));
 
-// Run every 6 hours
+// Run catalog sync every 6 hours
 setInterval(() => {
-  console.log('Running scheduled sync...');
+  console.log('Running scheduled catalog sync...');
   syncService.runGlobalSync().catch(e => console.error('Scheduled sync error', e));
 }, 6 * 60 * 60 * 1000);
+
+// Run TMDB enrichment every 5 minutes for pending items
+setInterval(() => {
+  syncService.runTMDBEnrichment(50).catch(e => console.error('Enrichment error', e));
+}, 5 * 60 * 1000);
