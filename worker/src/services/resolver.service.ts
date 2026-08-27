@@ -9,9 +9,9 @@ export class ResolverService {
       const parts = raw.split('#');
       if (parts.length >= 4) {
         try {
-          const accJson = atob(parts[1]);
+          const accJson = atob(parts[1] as string);
           const acc = JSON.parse(accJson);
-          return \`\${acc.baseUrl}/movie/\${acc.user}/\${acc.pass}/\${parts[2]}.\${parts[3]}\`;
+          return `${acc.baseUrl}/movie/${acc.user}/${acc.pass}/${parts[2]}.${parts[3]}`;
         } catch (e) {
           return raw;
         }
@@ -23,9 +23,9 @@ export class ResolverService {
       const parts = raw.split('#');
       if (parts.length >= 4) {
         try {
-          const accJson = atob(parts[1]);
+          const accJson = atob(parts[1] as string);
           const acc = JSON.parse(accJson);
-          return \`\${acc.baseUrl}/series/\${acc.user}/\${acc.pass}/\${parts[2]}.\${parts[3]}\`;
+          return `${acc.baseUrl}/series/${acc.user}/${acc.pass}/${parts[2]}.${parts[3]}`;
         } catch (e) {
           return raw;
         }
@@ -42,11 +42,11 @@ export class ResolverService {
       const paramsObj = { resolver: resolverType, request: raw };
       const paramsStr = JSON.stringify(paramsObj);
       const b64Payload = btoa(paramsStr);
-      const apiUrl = \`https://api.geekantenado.online/?resolver=\${encodeURIComponent(b64Payload)}\`;
+      const apiUrl = `https://api.geekantenado.online/?resolver=${encodeURIComponent(b64Payload)}`;
 
       const response = await fetch(apiUrl, {
         headers: {
-          'Authorization': \`Bearer \${this._geekToken}\`,
+          'Authorization': `Bearer ${this._geekToken}`,
           'User-Agent': 'Mozilla/5.0'
         }
       });

@@ -5,12 +5,12 @@ import { TMDBService } from './tmdb.service';
 function cleanTitle(raw: string): string {
   if (!raw) return '';
   let t = raw;
-  t = t.replace(/\\[\/?COLOR[^\]]*\\]/gi, '');
-  t = t.replace(/\\[\/?B\\]/gi, '');
-  t = t.replace(/\\[\/?I\\]/gi, '');
-  t = t.replace(/\\[OnePlay\\]/gi, '');
-  t = t.replace(/\\[Brazuca\\]/gi, '');
-  t = t.replace(/\\|\\|\\|/g, '').replace(/\\[CR\\]/g, '\\n').trim();
+  t = t.replace(/\[\/?COLOR[^\]]*\]/gi, '');
+  t = t.replace(/\[\/?B\]/gi, '');
+  t = t.replace(/\[\/?I\]/gi, '');
+  t = t.replace(/\[OnePlay\]/gi, '');
+  t = t.replace(/\[Brazuca\]/gi, '');
+  t = t.replace(/\|\|\|/g, '').replace(/\[CR\]/g, '\n').trim();
   return t;
 }
 
@@ -52,8 +52,8 @@ export class SyncService {
         internalId: movie.internalId,
         title: movie.name,
         overview: tmdbData?.overview || movie.info || '',
-        posterUrl: tmdbData?.poster_path ? \`https://image.tmdb.org/t/p/w500\${tmdbData.poster_path}\` : movie.thumb || '',
-        backdropUrl: tmdbData?.backdrop_path ? \`https://image.tmdb.org/t/p/w1280\${tmdbData.backdrop_path}\` : movie.fanart || '',
+        posterUrl: tmdbData?.poster_path ? `https://image.tmdb.org/t/p/w500${tmdbData.poster_path}` : movie.thumb || '',
+        backdropUrl: tmdbData?.backdrop_path ? `https://image.tmdb.org/t/p/w1280${tmdbData.backdrop_path}` : movie.fanart || '',
         rating: tmdbData?.vote_average?.toString() || '0',
         tmdbId: tmdbData?.id || null,
         category: movie.category || 'Movies'
@@ -63,8 +63,8 @@ export class SyncService {
           internalId: movie.internalId,
           title: movie.name,
           overview: tmdbData?.overview || movie.info || '',
-          posterUrl: tmdbData?.poster_path ? \`https://image.tmdb.org/t/p/w500\${tmdbData.poster_path}\` : movie.thumb || '',
-          backdropUrl: tmdbData?.backdrop_path ? \`https://image.tmdb.org/t/p/w1280\${tmdbData.backdrop_path}\` : movie.fanart || '',
+          posterUrl: tmdbData?.poster_path ? `https://image.tmdb.org/t/p/w500${tmdbData.poster_path}` : movie.thumb || '',
+          backdropUrl: tmdbData?.backdrop_path ? `https://image.tmdb.org/t/p/w1280${tmdbData.backdrop_path}` : movie.fanart || '',
           rating: tmdbData?.vote_average?.toString() || '0'
         }
       });
@@ -80,38 +80,39 @@ export class SyncService {
       if (!resp.ok) return [];
       const rawText = await resp.text();
       
-      const itemRegex = /<(?:channel|item)>([\\s\\S]*?)<\\/(?:channel|item)>/g;
+      const itemRegex = /<(?:channel|item)>([\s\S]*?)<\/(?:channel|item)>/g;
       let match;
       while ((match = itemRegex.exec(rawText)) !== null) {
         const itemStr = match[1];
+        if (!itemStr) continue;
         
-        const nameM = itemStr.match(/<(?:name|title)>([\\s\\S]*?)<\\/(?:name|title)>/);
-        if (!nameM) continue;
+        const nameM = itemStr.match(/<(?:name|title)>([\s\S]*?)<\/(?:name|title)>/);
+        if (!nameM || !nameM[1]) continue;
         const rawName = cleanTitle(nameM[1]);
         if (!rawName || rawName.toUpperCase().includes('PRÓXIMA PÁGINA')) continue;
 
-        const linkM = itemStr.match(/<(?:externallink|link)>([\\s\\S]*?)<\\/(?:externallink|link)>/);
-        const linkVal = linkM ? linkM[1].trim() : '';
+        const linkM = itemStr.match(/<(?:externallink|link)>([\s\S]*?)<\/(?:externallink|link)>/);
+        const linkVal = (linkM && linkM[1]) ? linkM[1].trim() : '';
         
-        const thumbM = itemStr.match(/<(?:thumbnail|poster|img)>([\\s\\S]*?)<\\/(?:thumbnail|poster|img)>/);
-        const thumbVal = decodePoster(thumbM ? thumbM[1].trim() : '');
+        const thumbM = itemStr.match(/<(?:thumbnail|poster|img)>([\s\S]*?)<\/(?:thumbnail|poster|img)>/);
+        const thumbVal = decodePoster((thumbM && thumbM[1]) ? thumbM[1].trim() : '');
         
-        const fanartM = itemStr.match(/<(?:fanart|backdrop|cover)>([\\s\\S]*?)<\\/(?:fanart|backdrop|cover)>/);
-        const fanartVal = decodePoster(fanartM ? fanartM[1].trim() : '') || thumbVal;
+        const fanartM = itemStr.match(/<(?:fanart|backdrop|cover)>([\s\S]*?)<\/(?:fanart|backdrop|cover)>/);
+        const fanartVal = decodePoster((fanartM && fanartM[1]) ? fanartM[1].trim() : '') || thumbVal;
         
-        const infoM = itemStr.match(/<info>([\\s\\S]*?)<\\/info>/);
-        const infoVal = cleanTitle(infoM ? infoM[1] : '');
+        const infoM = itemStr.match(/<info>([\s\S]*?)<\/info>/);
+        const infoVal = cleanTitle((infoM && infoM[1]) ? infoM[1] : '');
 
         let finalId = linkVal;
         if (linkVal.startsWith('#')) {
           const parts = linkVal.split('=');
-          if (parts.length > 1) {
+          if (parts.length > 1 && parts[1]) {
             finalId = parts[1];
           }
         }
 
         itemsOut.push({
-          id: \`vod_\${itemsOut.length + 1}\`,
+          id: `vod_${itemsOut.length + 1}`,
           name: rawName,
           thumb: thumbVal,
           fanart: fanartVal,
@@ -122,7 +123,7 @@ export class SyncService {
         });
       }
     } catch (e) {
-      console.error(\`[VOD] Error downloading \${category}: \`, e);
+      console.error(`[VOD] Error downloading ${category}: `, e);
     }
     return itemsOut;
   }
