@@ -8,8 +8,16 @@
 }
 
 @layer base {
+  html {
+    background-color: #0A0A0A;
+  }
   body {
     @apply bg-background text-white antialiased overflow-x-hidden;
+    zoom: 0.9;
+    height: calc(100vh / 0.9);
+  }
+  #root {
+    height: 100%;
   }
 }
 
