@@ -1,123 +1,161 @@
-import { Home, Tv, Radio, Search, User, Play, Info, Flame } from 'lucide-react';
+import { Home, Compass, Users, User, Search, Mic, Bell, Play, Plus, Eye } from 'lucide-react';
 
 function App() {
   return (
-    <div className="min-h-screen bg-background">
-      {/* Top Navigation */}
-      <nav className="flex items-center justify-between px-8 py-4">
-        {/* Left - Navigation links */}
-        <div className="flex items-center bg-surface/50 rounded-full px-2 py-2 gap-2 border border-white/5 shadow-[0_0_15px_rgba(255,255,255,0.05)]">
-          <button className="flex items-center gap-2 bg-white text-black px-6 py-2.5 rounded-full font-medium shadow-[0_0_20px_rgba(255,255,255,0.3)]">
-            <Home size={18} />
-            <span>Inicio</span>
+    <div className="flex h-screen bg-[#0A0A0A] text-white overflow-hidden font-sans">
+      
+      {/* Sidebar */}
+      <aside className="w-24 flex flex-col items-center py-8 bg-[#0A0A0A] z-20 border-r border-white/5">
+        {/* Logo */}
+        <div className="mb-12">
+          <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-red-500 rounded-xl flex items-center justify-center transform rotate-45">
+            <Play size={20} className="text-white -rotate-45 ml-1" fill="currentColor" />
+          </div>
+        </div>
+
+        {/* Navigation */}
+        <nav className="flex flex-col gap-8 w-full px-4">
+          <button className="flex flex-col items-center gap-1.5 text-white bg-white/10 py-3 rounded-2xl">
+            <Home size={22} />
+            <span className="text-[10px] font-medium">Home</span>
           </button>
+          <button className="flex flex-col items-center gap-1.5 text-gray-500 hover:text-white transition-colors">
+            <Compass size={22} />
+            <span className="text-[10px] font-medium">Discover</span>
+          </button>
+          <button className="flex flex-col items-center gap-1.5 text-gray-500 hover:text-white transition-colors">
+            <Users size={22} />
+            <span className="text-[10px] font-medium">Social</span>
+          </button>
+          <button className="flex flex-col items-center gap-1.5 text-gray-500 hover:text-white transition-colors mt-auto">
+            <User size={22} />
+            <span className="text-[10px] font-medium">Profile</span>
+          </button>
+        </nav>
+      </aside>
+
+      {/* Main Content */}
+      <main className="flex-1 relative overflow-y-auto hide-scrollbar">
+        
+        {/* Hero Background Image */}
+        <div className="absolute top-0 left-0 w-full h-[70vh] z-0">
+          <img 
+            src="https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?q=80&w=2072&auto=format&fit=crop" 
+            alt="Hero Background" 
+            className="w-full h-full object-cover"
+          />
+          {/* Gradient Overlays for smooth blending */}
+          <div className="absolute inset-0 bg-gradient-to-r from-[#0A0A0A] via-[#0A0A0A]/80 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-transparent to-transparent" />
+        </div>
+
+        {/* Top Bar (Search & Notifications) */}
+        <header className="relative z-10 flex justify-between items-center px-12 py-8">
+          <h1 className="text-2xl font-bold tracking-tight">StreamFlow</h1>
           
-          <button className="flex items-center gap-2 text-gray-400 hover:text-white px-6 py-2.5 rounded-full font-medium transition-colors">
-            <Tv size={18} />
-            <span>TV ao Vivo</span>
-          </button>
-
-          <button className="flex items-center gap-2 text-gray-400 hover:text-white px-6 py-2.5 rounded-full font-medium transition-colors">
-            <Radio size={18} />
-            <span>Eventos ao Vivo</span>
-            <span className="bg-primary text-white text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ml-1">Ao Vivo</span>
-          </button>
-        </div>
-
-        {/* Right - Search & Profile */}
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2 text-gray-400 bg-surface/50 px-6 py-2.5 rounded-full border border-white/5">
-            <Search size={18} />
-            <input 
-              type="text" 
-              placeholder="Buscar..." 
-              className="bg-transparent border-none outline-none text-sm w-32 placeholder:text-gray-500 text-white"
-            />
-          </div>
-          <button className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors pr-4">
-            <User size={18} />
-            <span className="font-medium">Visitante</span>
-          </button>
-        </div>
-      </nav>
-
-      {/* Hero Section */}
-      <main className="px-16 pt-12 pb-24 relative">
-        {/* Background Gradient (simulating the red glow from the screenshot) */}
-        <div className="absolute top-0 left-0 w-[600px] h-[600px] bg-primary/10 blur-[120px] rounded-full pointer-events-none -z-10" />
-
-        <div className="flex items-start justify-between max-w-7xl mx-auto">
-          {/* Left Content */}
-          <div className="max-w-2xl mt-16">
-            <div className="flex items-center gap-3 mb-6">
-              <span className="flex items-center gap-1.5 bg-primary/20 text-primary border border-primary/30 px-3 py-1.5 rounded-full text-xs font-bold tracking-wide shadow-[0_0_15px_rgba(255,42,66,0.3)]">
-                <Flame size={14} className="fill-primary" /> LANÇAMENTO DE CINEMA
-              </span>
-              <span className="bg-surface border border-white/10 text-gray-300 px-4 py-1.5 rounded-full text-xs font-bold tracking-wide">
-                AVENTURA, AÇÃO, DRAMA
-              </span>
+          <div className="flex items-center gap-6">
+            <div className="flex items-center bg-black/40 backdrop-blur-md border border-white/10 rounded-full px-4 py-2 w-80">
+              <input 
+                type="text" 
+                placeholder="Search" 
+                className="bg-transparent border-none outline-none text-sm w-full placeholder:text-gray-400 text-white"
+              />
+              <Mic size={16} className="text-gray-400 mx-2 cursor-pointer hover:text-white" />
+              <Search size={16} className="text-gray-400 cursor-pointer hover:text-white" />
             </div>
-
-            <h1 className="text-6xl font-black text-white leading-[1.1] mb-6 tracking-tight">
-              A MORTE DE ROBIN<br />HOOD [Brazuca]
-            </h1>
-
-            <div className="flex items-center gap-4 text-sm font-medium text-gray-400 mb-6">
-              <span className="flex items-center text-yellow-500 font-bold">
-                <span className="mr-1">★</span> 6.6 IMDb
-              </span>
-              <span>•</span>
-              <span>2026</span>
-              <span>•</span>
-              <span className="bg-white/10 text-white px-2 py-0.5 rounded text-xs">4K ULTRA HD</span>
-              <span>•</span>
-              <span className="bg-primary/20 text-primary border border-primary/30 px-2 py-0.5 rounded text-xs">DUAL ÁUDIO</span>
-            </div>
-
-            <p className="text-gray-400 text-sm leading-relaxed mb-10 max-w-xl">
-              Atormentado pelas cicatrizes de uma vida marcada pelo crime, Robin Hood sobrevive por 
-              pouco àquela que acreditava ser sua batalha final. Gravemente ferido, ele é encontrado por 
-              uma mulher misteriosa que o recolhe das sombras e passa a cuidar de seus ferimentos. Com o...
-            </p>
-
-            <div className="flex items-center gap-4">
-              <button className="flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-white px-8 py-3.5 rounded-full font-bold shadow-[0_0_25px_rgba(255,42,66,0.4)] transition-all transform hover:scale-105">
-                <Play size={20} className="fill-white" />
-                Assistir Agora
-              </button>
-              <button className="flex items-center justify-center gap-2 bg-surface hover:bg-surface/80 border border-white/10 text-white px-8 py-3.5 rounded-full font-bold transition-all">
-                <Info size={20} />
-                Ver Detalhes
-              </button>
-            </div>
+            <button className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center text-gray-300 hover:text-white transition-colors">
+              <Bell size={18} />
+            </button>
           </div>
+        </header>
 
-          {/* Right Poster Placeholder */}
-          <div className="mr-12 relative group mt-8">
-            <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-            <div className="w-[340px] h-[520px] bg-[#0f0f14] border border-white/5 rounded-3xl shadow-2xl relative z-10 overflow-hidden">
-               {/* This is where the movie poster image goes */}
-            </div>
-          </div>
-        </div>
-
-        {/* Categories Row */}
-        <div className="max-w-7xl mx-auto mt-20">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-1.5 h-6 bg-white rounded-full" />
-            <h2 className="text-xl font-bold text-white">Filmes de Cinema & Lançamentos</h2>
-          </div>
+        {/* Hero Content */}
+        <div className="relative z-10 px-12 pt-12 pb-16 max-w-2xl">
+          <h2 className="text-6xl font-bold mb-4 tracking-tight">Orbiting Sounds</h2>
+          <p className="text-gray-300 text-sm leading-relaxed mb-8 max-w-lg">
+            A gripping sci-fi series about a lone astronaut and market the description of the sound dramas and can control them and could vint them sometimes.
+          </p>
           
-          <div className="flex gap-4 overflow-x-auto pb-4 hide-scrollbar">
-            {/* Placeholder cards */}
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div key={i} className="min-w-[160px] h-[240px] bg-surface border border-white/5 rounded-2xl relative group cursor-pointer hover:border-white/20 transition-all">
-                <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
-                  4K
+          <div className="flex items-center gap-4">
+            <button className="flex items-center justify-center gap-2 bg-white hover:bg-gray-200 text-black px-8 py-3 rounded-xl font-semibold transition-colors">
+              <Play size={18} fill="currentColor" />
+              Play
+            </button>
+            <button className="flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/10 text-white px-8 py-3 rounded-xl font-semibold transition-colors">
+              <Plus size={18} />
+              Add to Watchlist
+            </button>
+          </div>
+        </div>
+
+        {/* Content Rows */}
+        <div className="relative z-10 px-12 pb-24 space-y-12 bg-gradient-to-b from-transparent to-[#0A0A0A]">
+          
+          {/* Trending Live Streams */}
+          <section>
+            <h3 className="text-xl font-semibold mb-4">Trending Live Streams</h3>
+            <div className="flex gap-4 overflow-x-auto hide-scrollbar pb-4 -mx-12 px-12">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="min-w-[280px] group cursor-pointer">
+                  <div className="w-full h-[160px] rounded-2xl overflow-hidden relative mb-3">
+                    <img 
+                      src={`https://images.unsplash.com/photo-1541873676-a18131494184?q=80&w=600&auto=format&fit=crop&sig=${i}`} 
+                      alt="Thumbnail" 
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    {/* Live Badge */}
+                    <div className="absolute top-2 right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+                      LIVE
+                    </div>
+                    {/* Viewers */}
+                    <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-md text-white text-[10px] font-medium px-2 py-1 rounded flex items-center gap-1">
+                      <Eye size={12} />
+                      19.3K
+                    </div>
+                  </div>
+                  <h4 className="font-medium text-sm text-white group-hover:text-red-400 transition-colors">Orbiting Sounds</h4>
+                  <p className="text-xs text-gray-500 mt-1">Homan Under</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* Bottom Grid: Curated & Community */}
+          <div className="grid grid-cols-3 gap-8">
+            <section className="col-span-2">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-semibold">Curated For You</h3>
+              </div>
+              <div className="flex gap-4 overflow-x-auto hide-scrollbar pb-4">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="min-w-[200px] h-[120px] rounded-2xl overflow-hidden relative cursor-pointer group">
+                    <img 
+                      src={`https://images.unsplash.com/photo-1618172193622-ae2d025f4032?q=80&w=400&auto=format&fit=crop&sig=${i+10}`} 
+                      alt="Curated" 
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                  </div>
+                ))}
+              </div>
+            </section>
+            
+            <section className="col-span-1">
+              <h3 className="text-xl font-semibold mb-4">Community Events</h3>
+              <div className="w-full h-[120px] rounded-2xl overflow-hidden relative cursor-pointer group">
+                <img 
+                  src="https://images.unsplash.com/photo-1470229722913-7c092bba85f1?q=80&w=400&auto=format&fit=crop" 
+                  alt="Events" 
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex flex-col justify-end p-4">
+                  <h4 className="font-medium text-sm text-white">Community Events</h4>
+                  <p className="text-xs text-gray-400 mt-1">Jan. 8 - 18, 2024</p>
                 </div>
               </div>
-            ))}
+            </section>
           </div>
+
         </div>
       </main>
     </div>
