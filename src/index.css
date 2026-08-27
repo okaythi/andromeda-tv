@@ -1,6 +1,11 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  --color-background: #0B0B0F;
+  --color-surface: #15151A;
+  --color-primary: #FF2A42;
+  --font-sans: Inter, system-ui, sans-serif;
+}
 
 @layer base {
   body {
