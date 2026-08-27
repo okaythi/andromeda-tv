@@ -1,6 +1,33 @@
+import { useEffect, useState } from 'react';
 import { Home, Compass, Users, User, Search, Mic, Bell, Play, Plus, Eye } from 'lucide-react';
+import { fetchMovies, fetchChannels, Movie, LiveStream } from './api/backend';
 
 function App() {
+  const [movies, setMovies] = useState<Movie[]>([]);
+  const [channels, setChannels] = useState<LiveStream[]>([]);
+
+  useEffect(() => {
+    fetchMovies(1, 10).then(setMovies);
+    fetchChannels().then(setChannels);
+  }, []);
+
+  // For visual mockup purposes, we'll use fallbacks if the backend isn't running yet
+  const displayMovies = movies.length > 0 ? movies : Array(5).fill({
+    id: 'mock',
+    title: 'Orbiting Sounds',
+    overview: 'A gripping sci-fi series.',
+    posterUrl: 'https://images.unsplash.com/photo-1618172193622-ae2d025f4032?q=80&w=400&auto=format&fit=crop',
+    backdropUrl: 'https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?q=80&w=2072&auto=format&fit=crop'
+  });
+
+  const displayChannels = channels.length > 0 ? channels : Array(5).fill({
+    id: 'mock',
+    name: 'Trending Live',
+    logoUrl: 'https://images.unsplash.com/photo-1541873676-a18131494184?q=80&w=600&auto=format&fit=crop'
+  });
+
+  const heroMovie = displayMovies[0];
+
   return (
     <div className="flex h-screen bg-[#0A0A0A] text-white overflow-hidden font-sans">
       
@@ -40,7 +67,7 @@ function App() {
         {/* Hero Background Image */}
         <div className="absolute top-0 left-0 w-full h-[70vh] z-0">
           <img 
-            src="https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?q=80&w=2072&auto=format&fit=crop" 
+            src={heroMovie?.backdropUrl || "https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?q=80&w=2072&auto=format&fit=crop"} 
             alt="Hero Background" 
             className="w-full h-full object-cover"
           />
@@ -71,9 +98,9 @@ function App() {
 
         {/* Hero Content */}
         <div className="relative z-10 px-12 pt-12 pb-16 max-w-2xl">
-          <h2 className="text-6xl font-bold mb-4 tracking-tight">Orbiting Sounds</h2>
+          <h2 className="text-6xl font-bold mb-4 tracking-tight">{heroMovie?.title}</h2>
           <p className="text-gray-300 text-sm leading-relaxed mb-8 max-w-lg">
-            A gripping sci-fi series about a lone astronaut and market the description of the sound dramas and can control them and could vint them sometimes.
+            {heroMovie?.overview}
           </p>
           
           <div className="flex items-center gap-4">
@@ -95,11 +122,11 @@ function App() {
           <section>
             <h3 className="text-xl font-semibold mb-4">Trending Live Streams</h3>
             <div className="flex gap-4 overflow-x-auto hide-scrollbar pb-4 -mx-12 px-12">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="min-w-[280px] group cursor-pointer">
+              {displayChannels.map((ch, i) => (
+                <div key={ch.id + i} className="min-w-[280px] group cursor-pointer">
                   <div className="w-full h-[160px] rounded-2xl overflow-hidden relative mb-3">
                     <img 
-                      src={`https://images.unsplash.com/photo-1541873676-a18131494184?q=80&w=600&auto=format&fit=crop&sig=${i}`} 
+                      src={ch.logoUrl || \`https://images.unsplash.com/photo-1541873676-a18131494184?q=80&w=600&auto=format&fit=crop&sig=\${i}\`} 
                       alt="Thumbnail" 
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
@@ -114,8 +141,8 @@ function App() {
                       19.3K
                     </div>
                   </div>
-                  <h4 className="font-medium text-sm text-white group-hover:text-red-400 transition-colors">Orbiting Sounds</h4>
-                  <p className="text-xs text-gray-500 mt-1">Homan Under</p>
+                  <h4 className="font-medium text-sm text-white group-hover:text-red-400 transition-colors">{ch.name}</h4>
+                  <p className="text-xs text-gray-500 mt-1">Live Feed</p>
                 </div>
               ))}
             </div>
@@ -128,10 +155,10 @@ function App() {
                 <h3 className="text-xl font-semibold">Curated For You</h3>
               </div>
               <div className="flex gap-4 overflow-x-auto hide-scrollbar pb-4">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="min-w-[200px] h-[120px] rounded-2xl overflow-hidden relative cursor-pointer group">
+                {displayMovies.slice(1).map((m, i) => (
+                  <div key={m.id + i} className="min-w-[200px] h-[300px] rounded-2xl overflow-hidden relative cursor-pointer group">
                     <img 
-                      src={`https://images.unsplash.com/photo-1618172193622-ae2d025f4032?q=80&w=400&auto=format&fit=crop&sig=${i+10}`} 
+                      src={m.posterUrl || \`https://images.unsplash.com/photo-1618172193622-ae2d025f4032?q=80&w=400&auto=format&fit=crop&sig=\${i+10}\`} 
                       alt="Curated" 
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
@@ -142,7 +169,7 @@ function App() {
             
             <section className="col-span-1">
               <h3 className="text-xl font-semibold mb-4">Community Events</h3>
-              <div className="w-full h-[120px] rounded-2xl overflow-hidden relative cursor-pointer group">
+              <div className="w-full h-[300px] rounded-2xl overflow-hidden relative cursor-pointer group">
                 <img 
                   src="https://images.unsplash.com/photo-1470229722913-7c092bba85f1?q=80&w=400&auto=format&fit=crop" 
                   alt="Events" 
