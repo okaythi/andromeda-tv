@@ -1,5 +1,6 @@
 import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { movies, series, channels } from '../schema';
+import * as schema from '../schema';
 import { TMDBService } from './tmdb.service';
 import { BrazucaParser } from './parsers/brazuca.parser';
 import { OnePlayParser } from './parsers/oneplay.parser';
@@ -10,7 +11,7 @@ export class SyncService {
   private isSyncing = false;
 
   constructor(
-    private readonly db: BetterSQLite3Database,
+    private readonly db: BetterSQLite3Database<typeof schema>,
     private readonly tmdb: TMDBService
   ) {}
 
