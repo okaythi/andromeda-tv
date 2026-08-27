@@ -1,9 +1,10 @@
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { streamSSE } from 'hono/streaming';
 import { vodRouter } from './routes/vod.routes';
 import { liveRouter } from './routes/live.routes';
-import { SyncService } from './services/sync.service';
+import { SyncService, type SyncState } from './services/sync.service';
 import { TMDBService } from './services/tmdb.service';
 import { db } from './db';
 import * as dotenv from 'dotenv';
@@ -20,6 +21,35 @@ app.use('/*', cors({
 
 app.get('/api/health', (c) => c.json({ status: 'online' }));
 
+// Initialize services early so we can attach them to routes
+const tmdbService = new TMDBService(process.env['TMDB_READ_ACCESS_TOKEN'] || '');
+const syncService = new SyncService(db, tmdbService);
+
+app.get('/api/sync/status', (c) => {
+  return streamSSE(c, async (stream) => {
+    // Send immediate initial state
+    await stream.writeSSE({
+      data: JSON.stringify(syncService.getState()),
+    });
+
+    // Listen to changes
+    const listener = (state: SyncState) => {
+      stream.writeSSE({
+        data: JSON.stringify(state)
+      }).catch(() => {});
+    };
+    syncService.events.on('status', listener);
+
+    // Keep alive until aborted
+    await new Promise<void>((resolve) => {
+      c.req.raw.signal.addEventListener('abort', () => {
+        syncService.events.off('status', listener);
+        resolve();
+      });
+    });
+  });
+});
+
 app.route('/api/vod', vodRouter);
 app.route('/api/live', liveRouter);
 
@@ -30,10 +60,6 @@ serve({
   fetch: app.fetch,
   port
 });
-
-// Background sync
-const tmdbService = new TMDBService(process.env['TMDB_READ_ACCESS_TOKEN'] || '');
-const syncService = new SyncService(db, tmdbService);
 
 console.log('Running initial sync...');
 syncService.runGlobalSync().then(() => {

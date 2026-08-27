@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { XMLParser } from 'fast-xml-parser';
 
 export const ParsedItemSchema = z.object({
   id: z.string(),
@@ -41,23 +42,60 @@ export function decodePoster(url: string | undefined | null): string {
   try {
     const dec = atob(clean);
     if (dec.startsWith('http')) return dec;
-  } catch (e) {
+  } catch {
     // Ignore error
   }
   return clean;
 }
 
+function ensureArray(val: unknown): any[] {
+  if (!val) return [];
+  if (Array.isArray(val)) return val;
+  return [val];
+}
+
 export class BrazucaParser {
+  private parser = new XMLParser({
+    ignoreAttributes: true,
+    parseTagValue: false, // keep everything as strings
+  });
+
   private classifyChannel(title: string): string {
     const t = (title || '').toLowerCase();
     if (['sportv', 'espn', 'futebol', 'ufc', 'tnt sports', 'premiere', 'combate', 'dazn', 'bandsports', 'nba'].some(k => t.includes(k))) return 'esportes';
     if (['globo', 'sbt', 'record', 'band', 'redetv', 'cultura'].some(k => t.includes(k))) return 'abertos';
     if (['filme', 'cine', 'hbo', 'telecine', 'axn', 'fox', 'megapix', 'paramount', 'warner', 'universal', 'sony'].some(k => t.includes(k))) return 'filmes';
-    if (['news', 'notÃ­cia', 'noticia', 'cnn', 'bandnews', 'record news', 'globonews', 'jovem pan'].some(k => t.includes(k))) return 'noticias';
+    if (['news', 'notícia', 'noticia', 'cnn', 'bandnews', 'record news', 'globonews', 'jovem pan'].some(k => t.includes(k))) return 'noticias';
     if (['kids', 'cartoon', 'disney', 'nickelodeon', 'discovery kids', 'gloob', 'tooncast', 'nick jr'].some(k => t.includes(k))) return 'infantil';
     if (['discovery', 'history', 'animal planet', 'nat geo', 'national geographic', 'curta', 'h2', 'doc'].some(k => t.includes(k))) return 'docs';
     if (['multishow', 'viva', 'mtv', 'gnt', 'bis', 'comedy central', 'tlc', 'e!'].some(k => t.includes(k))) return 'variedades';
     return 'outros';
+  }
+
+  private extractItems(jsonObj: any): any[] {
+    const foundItems: any[] = [];
+    
+    function search(obj: any) {
+      if (!obj || typeof obj !== 'object') return;
+      
+      if (obj.item) foundItems.push(...ensureArray(obj.item));
+      if (obj.channel) {
+         const channels = ensureArray(obj.channel);
+         channels.forEach(c => {
+           if (c.item) foundItems.push(...ensureArray(c.item));
+           else foundItems.push(c);
+         });
+      }
+  
+      for (const key of Object.keys(obj)) {
+         if (key !== 'item' && key !== 'channel' && typeof obj[key] === 'object') {
+             search(obj[key]);
+         }
+      }
+    }
+    
+    search(jsonObj);
+    return foundItems;
   }
 
   public async fetchChannels(url: string): Promise<ParsedChannel[]> {
@@ -66,30 +104,20 @@ export class BrazucaParser {
       const resp = await fetch(url);
       if (!resp.ok) return [];
       const rawText = await resp.text();
+      const jsonObj = this.parser.parse(rawText);
+      const items = this.extractItems(jsonObj);
 
-      const itemRegex = /<item>([\s\S]*?)<\/item>/g;
-      let match;
-      while ((match = itemRegex.exec(rawText)) !== null) {
-        const itemStr = match[1];
-        if (!itemStr) continue;
-
-        const titleM = itemStr.match(/<(?:title|name)>([\s\S]*?)<\/(?:title|name)>/);
-        if (!titleM || !titleM[1]) continue;
-        const rawTitle = cleanTitle(titleM[1]);
+      for (const item of items) {
+        const rawTitle = cleanTitle(item.title || item.name);
         if (!rawTitle || rawTitle.startsWith("|||")) continue;
 
-        const linkM = itemStr.match(/<link>([\s\S]*?)<\/link>/);
-        const linkVal = (linkM && linkM[1]) ? linkM[1].trim() : '';
-
-        const thumbM = itemStr.match(/<(?:thumbnail|poster)>([\s\S]*?)<\/(?:thumbnail|poster)>/);
-        const thumbVal = decodePoster((thumbM && thumbM[1]) ? thumbM[1].trim() : '');
+        const linkVal = typeof item.link === 'string' ? item.link.trim() : '';
+        const thumbVal = decodePoster(item.thumbnail || item.poster);
 
         let finalId = linkVal;
         if (linkVal.startsWith('chresolver1=')) {
           const parts = linkVal.replace('chresolver1=', '').split('#');
-          if (parts[0]) {
-            finalId = parts[0];
-          }
+          if (parts[0]) finalId = parts[0];
         }
 
         if (finalId) {
@@ -105,39 +133,29 @@ export class BrazucaParser {
       }
     } catch (e) {
       console.error('[Channels] Error: ', e);
+      throw e;
     }
     return out;
   }
 
-  public async fetchVod(url: string, category: string, contentType: string, idPrefix: string = 'vod_'): Promise<ParsedItem[]> {
+  public async fetchVod(url: string, category: string, contentType: string, idPrefix = 'vod_'): Promise<ParsedItem[]> {
     const itemsOut: ParsedItem[] = [];
     try {
       const resp = await fetch(url);
       if (!resp.ok) return [];
       const rawText = await resp.text();
+      const jsonObj = this.parser.parse(rawText);
+      const items = this.extractItems(jsonObj);
       
-      const itemRegex = /<(?:channel|item)>([\s\S]*?)<\/(?:channel|item)>/g;
-      let match;
-      while ((match = itemRegex.exec(rawText)) !== null) {
-        const itemStr = match[1];
-        if (!itemStr) continue;
-        
-        const nameM = itemStr.match(/<(?:name|title)>([\s\S]*?)<\/(?:name|title)>/);
-        if (!nameM || !nameM[1]) continue;
-        const rawName = cleanTitle(nameM[1]);
-        if (!rawName || rawName.toUpperCase().includes('PRÃ“XIMA PÃ GINA')) continue;
+      for (const item of items) {
+        const rawName = cleanTitle(item.name || item.title);
+        // Better UTF-8 support now, no more hardcoded encoding gore
+        if (!rawName || rawName.toUpperCase().includes('PRÓXIMA PÁGINA') || rawName.toUpperCase().includes('PRÃ“XIMA PÃ GINA')) continue;
 
-        const linkM = itemStr.match(/<(?:externallink|link)>([\s\S]*?)<\/(?:externallink|link)>/);
-        const linkVal = (linkM && linkM[1]) ? linkM[1].trim() : '';
-        
-        const thumbM = itemStr.match(/<(?:thumbnail|poster|img)>([\s\S]*?)<\/(?:thumbnail|poster|img)>/);
-        const thumbVal = decodePoster((thumbM && thumbM[1]) ? thumbM[1].trim() : '');
-        
-        const fanartM = itemStr.match(/<(?:fanart|backdrop|cover)>([\s\S]*?)<\/(?:fanart|backdrop|cover)>/);
-        const fanartVal = decodePoster((fanartM && fanartM[1]) ? fanartM[1].trim() : '') || thumbVal;
-        
-        const infoM = itemStr.match(/<info>([\s\S]*?)<\/info>/);
-        const infoVal = cleanTitle((infoM && infoM[1]) ? infoM[1] : '');
+        const linkVal = typeof item.externallink === 'string' ? item.externallink.trim() : (typeof item.link === 'string' ? item.link.trim() : '');
+        const thumbVal = decodePoster(item.thumbnail || item.poster || item.img);
+        const fanartVal = decodePoster(item.fanart || item.backdrop || item.cover) || thumbVal;
+        const infoVal = cleanTitle(item.info);
 
         let finalId = linkVal;
         if (linkVal.startsWith('#')) {
@@ -147,20 +165,23 @@ export class BrazucaParser {
           }
         }
 
-        const parsed = ParsedItemSchema.safeParse({
-          id: `${idPrefix}${itemsOut.length + 1}`,
-          name: rawName,
-          thumb: thumbVal,
-          fanart: fanartVal,
-          category,
-          contentType,
-          info: infoVal,
-          internalId: finalId
-        });
-        if (parsed.success) itemsOut.push(parsed.data);
+        if (finalId) {
+          const parsed = ParsedItemSchema.safeParse({
+            id: `${idPrefix}${itemsOut.length + 1}`,
+            name: rawName,
+            thumb: thumbVal,
+            fanart: fanartVal,
+            category,
+            contentType,
+            info: infoVal,
+            internalId: finalId
+          });
+          if (parsed.success) itemsOut.push(parsed.data);
+        }
       }
     } catch (e) {
       console.error(`[VOD] Error downloading ${category}: `, e);
+      throw e;
     }
     return itemsOut;
   }

@@ -1,10 +1,25 @@
-
-import { Search, Mic, Bell } from 'lucide-react';
+import { Search, Mic, Bell, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { useSyncStatus } from '../hooks/useSyncStatus';
 
 export function Header() {
+  const status = useSyncStatus();
+
   return (
     <header className="relative z-10 flex justify-between items-center px-12 py-8">
-      <h1 className="text-2xl font-bold tracking-tight">Andromeda TV</h1>
+      <div className="flex items-center gap-4">
+        <h1 className="text-2xl font-bold tracking-tight">Andromeda TV</h1>
+        
+        {/* Sync Indicator */}
+        <div className="flex items-center" title={status.lastError ? `Sync Error: ${status.lastError}` : (status.isSyncing ? 'Syncing catalogs...' : (status.isEnriching ? 'Enriching metadata...' : 'Up to date'))}>
+          {status.lastError ? (
+            <AlertCircle size={16} className="text-red-500" />
+          ) : status.isSyncing || status.isEnriching ? (
+            <RefreshCw size={16} className="text-blue-400 animate-spin" />
+          ) : status.lastSuccess ? (
+            <CheckCircle2 size={16} className="text-green-500/50" />
+          ) : null}
+        </div>
+      </div>
 
       <div className="flex items-center gap-6">
         <div className="flex items-center bg-black/40 backdrop-blur-md border border-white/10 rounded-full px-4 py-2 w-80">

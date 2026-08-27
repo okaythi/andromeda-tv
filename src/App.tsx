@@ -1,27 +1,16 @@
 import { useEffect, useState } from 'react';
-import { fetchHome, fetchChannels, type Movie, type LiveStream } from './api/backend';
+import { fetchHome, fetchChannels, type LiveStream, type HomeData } from './api/backend';
 import { Sidebar, type ViewType } from './components/Sidebar';
 import { HomeView } from './views/HomeView';
 import { ChannelsGrid } from './views/ChannelsGrid';
 
 function App() {
-  const [movies, setMovies] = useState<Movie[]>([]);
+  const [homeData, setHomeData] = useState<HomeData | null>(null);
   const [channels, setChannels] = useState<LiveStream[]>([]);
   const [currentView, setCurrentView] = useState<ViewType>('home');
 
   useEffect(() => {
-    fetchHome().then(data => {
-      // Flatten the categories so HomeView's groupBy can recreate them, 
-      // or we can change HomeView to accept the categorized data directly.
-      // For now, flatten it so HomeView works without changes:
-      const allMixed = [
-        ...data.popular_movies, 
-        ...data.popular_series, 
-        ...data.animes, 
-        ...data.doramas
-      ];
-      setMovies(allMixed);
-    });
+    fetchHome().then(setHomeData);
     fetchChannels().then(setChannels);
   }, []);
 
@@ -32,7 +21,7 @@ function App() {
       <main className="flex-1 relative overflow-y-auto hide-scrollbar">
         {currentView === 'home' ? (
           <HomeView
-            movies={movies}
+            homeData={homeData}
             channels={channels}
             onViewAllChannels={() => setCurrentView('channels')}
           />

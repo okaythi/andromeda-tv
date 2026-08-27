@@ -26,7 +26,7 @@ export class OnePlayParser {
           }
         }
       } catch (e) {
-        // ignore
+        // Continue trying other master URLs
       }
     }
 
@@ -55,11 +55,16 @@ export class OnePlayParser {
           }
         }
       } catch (e) {
-        // ignore
+        // Safe to ignore individual dead servers
       }
     });
 
     await Promise.allSettled(checkPromises);
+    
+    if (Object.keys(accounts).length === 0) {
+      throw new Error("OnePlay Sync Failed: No active accounts found.");
+    }
+    
     return accounts;
   }
 
@@ -71,62 +76,65 @@ export class OnePlayParser {
       const accB64 = btoa(JSON.stringify(acc));
 
       // Movies
-      try {
-        const mUrl = `${acc.baseUrl}/player_api.php?username=${acc.user}&password=${acc.pass}&action=get_vod_streams`;
-        const mResp = await fetch(mUrl);
-        if (mResp.ok) {
-          const data = await mResp.json();
-          if (Array.isArray(data)) {
-            for (const m of data) {
-              const name = cleanTitle(m.name || "");
-              const s_id = m.stream_id;
-              const ext = m.container_extension || "mp4";
-              if (name && s_id) {
-                movies.push({
-                  id: `op_m_${s_id}`,
-                  name,
-                  thumb: decodePoster(m.stream_icon),
-                  fanart: decodePoster(m.stream_icon),
-                  category: "Filmes",
-                  contentType: "movie",
-                  info: `Rating: ${m.rating || '8.0'}`,
-                  internalId: `opmovie_${accB64}_${s_id}_${ext}`
-                });
-              }
-            }
+      const mUrl = `${acc.baseUrl}/player_api.php?username=${acc.user}&password=${acc.pass}&action=get_vod_streams`;
+      const mResp = await fetch(mUrl);
+      if (!mResp.ok) throw new Error(`Failed to fetch OnePlay movies for ${acc.user}: HTTP ${mResp.status}`);
+      
+      const mData = await mResp.json();
+      if (Array.isArray(mData)) {
+        for (const m of mData) {
+          const name = cleanTitle(m.name || "");
+          const s_id = m.stream_id;
+          const ext = m.container_extension || "mp4";
+          if (name && s_id) {
+            movies.push({
+              id: `op_m_${s_id}`,
+              name,
+              thumb: decodePoster(m.stream_icon),
+              fanart: decodePoster(m.stream_icon),
+              category: "Filmes",
+              contentType: "movie",
+              info: `Rating: ${m.rating || '8.0'}`,
+              internalId: `opmovie_${accB64}_${s_id}_${ext}`
+            });
           }
         }
-      } catch (e) {}
+      }
 
       // Series
-      try {
-        const sUrl = `${acc.baseUrl}/player_api.php?username=${acc.user}&password=${acc.pass}&action=get_series`;
-        const sResp = await fetch(sUrl);
-        if (sResp.ok) {
-          const data = await sResp.json();
-          if (Array.isArray(data)) {
-            for (const s of data) {
-              const name = cleanTitle(s.name || "");
-              const series_id = s.series_id;
-              if (name && series_id) {
-                series.push({
-                  id: `op_s_${series_id}`,
-                  name,
-                  thumb: decodePoster(s.cover),
-                  fanart: decodePoster(s.cover),
-                  category: "Séries",
-                  contentType: "tv",
-                  info: cleanTitle(s.plot || ""),
-                  internalId: `opseries_${accB64}_${series_id}`
-                });
-              }
-            }
+      const sUrl = `${acc.baseUrl}/player_api.php?username=${acc.user}&password=${acc.pass}&action=get_series`;
+      const sResp = await fetch(sUrl);
+      if (!sResp.ok) throw new Error(`Failed to fetch OnePlay series for ${acc.user}: HTTP ${sResp.status}`);
+      
+      const sData = await sResp.json();
+      if (Array.isArray(sData)) {
+        for (const s of sData) {
+          const name = cleanTitle(s.name || "");
+          const series_id = s.series_id;
+          if (name && series_id) {
+            series.push({
+              id: `op_s_${series_id}`,
+              name,
+              thumb: decodePoster(s.cover),
+              fanart: decodePoster(s.cover),
+              category: "Séries",
+              contentType: "tv",
+              info: cleanTitle(s.plot || ""),
+              internalId: `opseries_${accB64}_${series_id}`
+            });
           }
         }
-      } catch (e) {}
+      }
     });
 
-    await Promise.allSettled(fetchPromises);
+    const results = await Promise.allSettled(fetchPromises);
+    const failures = results.filter(r => r.status === 'rejected');
+    
+    if (failures.length === results.length && results.length > 0) {
+      // If all accounts failed, throw the first error
+      throw (failures[0] as PromiseRejectedResult).reason;
+    }
+
     return { movies, series };
   }
 }

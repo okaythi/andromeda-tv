@@ -1,5 +1,6 @@
 import { sql, eq, isNull } from 'drizzle-orm';
 import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import { EventEmitter } from 'events';
 import { channels, movies, series } from '../schema';
 import * as schema from '../schema';
 import { TMDBService } from './tmdb.service';
@@ -17,9 +18,21 @@ const BRAZUCA_FEEDS = [
   { url: `${GIST_BASE}SeriesBase`, category: 'Séries', type: 'tv', prefix: 'ser_' },
 ] as const;
 
+export type SyncState = {
+  isSyncing: boolean;
+  isEnriching: boolean;
+  lastError: string | null;
+  lastSuccess: string | null;
+};
+
 export class SyncService {
-  private isSyncing = false;
-  private isEnriching = false;
+  public events = new EventEmitter();
+  private state: SyncState = {
+    isSyncing: false,
+    isEnriching: false,
+    lastError: null,
+    lastSuccess: null,
+  };
 
   constructor(
     private readonly db: BetterSQLite3Database<typeof schema>,
@@ -28,9 +41,18 @@ export class SyncService {
     private readonly oneplay = new OnePlayParser()
   ) {}
 
+  public getState(): SyncState {
+    return this.state;
+  }
+
+  private updateState(partial: Partial<SyncState>) {
+    this.state = { ...this.state, ...partial };
+    this.events.emit('status', this.state);
+  }
+
   public async runGlobalSync(): Promise<void> {
-    if (this.isSyncing) return;
-    this.isSyncing = true;
+    if (this.state.isSyncing) return;
+    this.updateState({ isSyncing: true, lastError: null });
 
     try {
       const [accounts, brazucaChannels, vodCatalogs] = await Promise.all([
@@ -51,29 +73,31 @@ export class SyncService {
         this.upsertSeries(allSeries);
       });
       
+      this.updateState({ lastSuccess: new Date().toISOString() });
       console.log(`Global sync completed: ${brazucaChannels.length} channels, ${allMovies.length} movies, ${allSeries.length} series.`);
     } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.updateState({ lastError: msg });
       console.error('[SyncService] Global sync failed:', error);
     } finally {
-      this.isSyncing = false;
+      this.updateState({ isSyncing: false });
     }
   }
 
   public async runTMDBEnrichment(batchSize = 50): Promise<void> {
-    if (this.isEnriching) return;
-    this.isEnriching = true;
+    if (this.state.isEnriching) return;
+    this.updateState({ isEnriching: true });
 
     try {
       const pendingMovies = await this.db.select().from(movies).where(isNull(movies.tmdbId)).limit(batchSize);
       
       for (const m of pendingMovies) {
-        // Sleep to avoid TMDB rate limits (approx 40-50 req/sec allowed, but play it safe)
         await new Promise(resolve => setTimeout(resolve, 100));
         const data = await this.tmdb.searchMovie(m.title);
         
         await this.db.update(movies)
           .set({
-            tmdbId: data?.id ?? -1, // -1 denotes 'not found', preventing infinite retries
+            tmdbId: data?.id ?? -1,
             overview: data?.overview || m.overview,
             posterUrl: data?.poster_path ? `https://image.tmdb.org/t/p/w500${data.poster_path}` : m.posterUrl,
             backdropUrl: data?.backdrop_path ? `https://image.tmdb.org/t/p/w1280${data.backdrop_path}` : m.backdropUrl,
@@ -107,7 +131,7 @@ export class SyncService {
     } catch (error) {
       console.error('[SyncService] TMDB Enrichment failed:', error);
     } finally {
-      this.isEnriching = false;
+      this.updateState({ isEnriching: false });
     }
   }
 
