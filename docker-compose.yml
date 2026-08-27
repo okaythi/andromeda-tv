@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: andromeda-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - sqlite_data:/app/data
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+    environment:
+      - DATABASE_URL=file:/app/data/sqlite.db
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: caddy-proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    command: caddy reverse-proxy --from :80 --to backend:3000
+    depends_on:
+      - backend
+
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --interval 60
+
+volumes:
+  sqlite_data:

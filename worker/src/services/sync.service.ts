@@ -1,34 +1,13 @@
 import { DrizzleD1Database } from 'drizzle-orm/d1';
-import { movies } from '../schema';
+import { movies, series, channels } from '../schema';
 import { TMDBService } from './tmdb.service';
-
-function cleanTitle(raw: string): string {
-  if (!raw) return '';
-  let t = raw;
-  t = t.replace(/\[\/?COLOR[^\]]*\]/gi, '');
-  t = t.replace(/\[\/?B\]/gi, '');
-  t = t.replace(/\[\/?I\]/gi, '');
-  t = t.replace(/\[OnePlay\]/gi, '');
-  t = t.replace(/\[Brazuca\]/gi, '');
-  t = t.replace(/\|\|\|/g, '').replace(/\[CR\]/g, '\n').trim();
-  return t;
-}
-
-function decodePoster(url: string | undefined): string {
-  if (!url) return '';
-  const clean = url.trim();
-  if (!clean || clean === '[object Object]') return '';
-  if (clean.startsWith('http://') || clean.startsWith('https://')) return clean;
-  try {
-    const dec = atob(clean);
-    if (dec.startsWith('http')) return dec;
-  } catch (e) {
-    // Ignore error
-  }
-  return clean;
-}
+import { BrazucaParser } from './parsers/brazuca.parser';
+import { OnePlayParser } from './parsers/oneplay.parser';
 
 export class SyncService {
+  private brazuca = new BrazucaParser();
+  private oneplay = new OnePlayParser();
+
   constructor(
     private readonly db: DrizzleD1Database,
     private readonly tmdb: TMDBService
@@ -36,14 +15,63 @@ export class SyncService {
 
   public async runGlobalSync(): Promise<void> {
     console.log('Starting global background sync...');
-    
-    // Fetch Brazuca VOD (Lancamentos)
-    const moviesUrl = "https://gist.githubusercontent.com/skyrisk/5b87797329c7b46422565ffbaab3be7e/raw/lancamentos.xml";
-    const rawMovies = await this.fetchBrazucaVod(moviesUrl, 'Lançamentos', 'movie');
 
-    // Process and enrich Movies
-    for (const movie of rawMovies) {
-      // Throttle TMDB to respect 40 req/sec limit
+    // 1. Fetch OnePlay Accounts
+    const accounts = await this.oneplay.syncOnePlayAccounts();
+
+    // 2. Parallel Fetch All XMLs & APIs
+    const gistBase = "https://gist.githubusercontent.com/skyrisk/16070347f20c87c72540f9f805b57a66/raw/";
+    const moviesGist = "https://gist.githubusercontent.com/skyrisk/5b87797329c7b46422565ffbaab3be7e/raw/";
+
+    console.log('Fetching catalogs...');
+    const [
+      chRes, lancamentosRes, pageRes,
+      animesRes, doramasRes, seriesRes, opVodRes
+    ] = await Promise.allSettled([
+      this.brazuca.fetchChannels(`${gistBase}channels.xml`),
+      this.brazuca.fetchVod(`${moviesGist}lancamentos.xml`, 'Lançamentos', 'movie', 0),
+      this.brazuca.fetchVod(`${moviesGist}page.xml`, 'Filmes', 'movie', 1000),
+      this.brazuca.fetchVod(`${gistBase}AnimesBase`, 'Animes', 'tv', 0),
+      this.brazuca.fetchVod(`${gistBase}DoramasBase`, 'Doramas', 'tv', 0),
+      this.brazuca.fetchVod(`${gistBase}SeriesBase`, 'Séries', 'tv', 0),
+      this.oneplay.fetchVod(accounts)
+    ]);
+
+    const rawChannels = chRes.status === 'fulfilled' ? chRes.value : [];
+    const lancamentos = lancamentosRes.status === 'fulfilled' ? lancamentosRes.value : [];
+    const filmes = pageRes.status === 'fulfilled' ? pageRes.value : [];
+    const animes = animesRes.status === 'fulfilled' ? animesRes.value : [];
+    const doramas = doramasRes.status === 'fulfilled' ? doramasRes.value : [];
+    const brazucaSeries = seriesRes.status === 'fulfilled' ? seriesRes.value : [];
+    const { movies: opMovies, series: opSeries } = opVodRes.status === 'fulfilled' ? opVodRes.value : { movies: [], series: [] };
+
+    // 3. Insert Channels
+    console.log(`Inserting ${rawChannels.length} channels...`);
+    for (const ch of rawChannels) {
+      await this.db.insert(channels).values({
+        id: ch.id,
+        internalId: ch.internalId,
+        name: ch.name,
+        logoUrl: ch.thumb,
+        category: ch.category,
+        source: 'Brazuca',
+        links: JSON.stringify([{ url: ch.internalId, ua: 'XC-IPTV' }])
+      }).onConflictDoUpdate({
+        target: channels.id,
+        set: {
+          internalId: ch.internalId,
+          name: ch.name,
+          logoUrl: ch.thumb,
+          category: ch.category
+        }
+      });
+    }
+
+    // 4. Insert Movies (Lancamentos + Filmes + OnePlay Movies)
+    const allMovies = [...lancamentos, ...filmes, ...opMovies];
+    console.log(`Processing ${allMovies.length} movies...`);
+    for (const movie of allMovies) {
+      // Respect TMDB limits
       await new Promise(resolve => setTimeout(resolve, 50));
       const tmdbData = await this.tmdb.searchMovie(movie.name);
 
@@ -70,61 +98,37 @@ export class SyncService {
       });
     }
 
-    console.log('Global sync completed successfully.');
-  }
+    // 5. Insert Series (Animes + Doramas + BrazucaSeries + OnePlaySeries)
+    const allSeries = [...animes, ...doramas, ...brazucaSeries, ...opSeries];
+    console.log(`Processing ${allSeries.length} series...`);
+    for (const s of allSeries) {
+      // Respect TMDB limits
+      await new Promise(resolve => setTimeout(resolve, 50));
+      const tmdbData = await this.tmdb.searchMovie(s.name); // Reusing searchMovie for simplicity, ideally searchTv
 
-  private async fetchBrazucaVod(url: string, category: string, contentType: string) {
-    const itemsOut: Array<{id: string, name: string, thumb: string, fanart: string, category: string, contentType: string, info: string, internalId: string}> = [];
-    try {
-      const resp = await fetch(url);
-      if (!resp.ok) return [];
-      const rawText = await resp.text();
-      
-      const itemRegex = /<(?:channel|item)>([\s\S]*?)<\/(?:channel|item)>/g;
-      let match;
-      while ((match = itemRegex.exec(rawText)) !== null) {
-        const itemStr = match[1];
-        if (!itemStr) continue;
-        
-        const nameM = itemStr.match(/<(?:name|title)>([\s\S]*?)<\/(?:name|title)>/);
-        if (!nameM || !nameM[1]) continue;
-        const rawName = cleanTitle(nameM[1]);
-        if (!rawName || rawName.toUpperCase().includes('PRÓXIMA PÁGINA')) continue;
-
-        const linkM = itemStr.match(/<(?:externallink|link)>([\s\S]*?)<\/(?:externallink|link)>/);
-        const linkVal = (linkM && linkM[1]) ? linkM[1].trim() : '';
-        
-        const thumbM = itemStr.match(/<(?:thumbnail|poster|img)>([\s\S]*?)<\/(?:thumbnail|poster|img)>/);
-        const thumbVal = decodePoster((thumbM && thumbM[1]) ? thumbM[1].trim() : '');
-        
-        const fanartM = itemStr.match(/<(?:fanart|backdrop|cover)>([\s\S]*?)<\/(?:fanart|backdrop|cover)>/);
-        const fanartVal = decodePoster((fanartM && fanartM[1]) ? fanartM[1].trim() : '') || thumbVal;
-        
-        const infoM = itemStr.match(/<info>([\s\S]*?)<\/info>/);
-        const infoVal = cleanTitle((infoM && infoM[1]) ? infoM[1] : '');
-
-        let finalId = linkVal;
-        if (linkVal.startsWith('#')) {
-          const parts = linkVal.split('=');
-          if (parts.length > 1 && parts[1]) {
-            finalId = parts[1];
-          }
+      await this.db.insert(series).values({
+        id: s.id,
+        internalId: s.internalId,
+        title: s.name,
+        overview: tmdbData?.overview || s.info || '',
+        posterUrl: tmdbData?.poster_path ? `https://image.tmdb.org/t/p/w500${tmdbData.poster_path}` : s.thumb || '',
+        backdropUrl: tmdbData?.backdrop_path ? `https://image.tmdb.org/t/p/w1280${tmdbData.backdrop_path}` : s.fanart || '',
+        rating: tmdbData?.vote_average?.toString() || '0',
+        tmdbId: tmdbData?.id || null,
+        category: s.category || 'Series'
+      }).onConflictDoUpdate({
+        target: series.id,
+        set: {
+          internalId: s.internalId,
+          title: s.name,
+          overview: tmdbData?.overview || s.info || '',
+          posterUrl: tmdbData?.poster_path ? `https://image.tmdb.org/t/p/w500${tmdbData.poster_path}` : s.thumb || '',
+          backdropUrl: tmdbData?.backdrop_path ? `https://image.tmdb.org/t/p/w1280${tmdbData.backdrop_path}` : s.fanart || '',
+          rating: tmdbData?.vote_average?.toString() || '0'
         }
-
-        itemsOut.push({
-          id: `vod_${itemsOut.length + 1}`,
-          name: rawName,
-          thumb: thumbVal,
-          fanart: fanartVal,
-          category,
-          contentType,
-          info: infoVal,
-          internalId: finalId
-        });
-      }
-    } catch (e) {
-      console.error(`[VOD] Error downloading ${category}: `, e);
+      });
     }
-    return itemsOut;
+
+    console.log('Global sync completed successfully.');
   }
 }
