@@ -8,4 +8,16 @@ crons = ["0 */6 * * *"] # Every 6 hours
 [[d1_databases]]
 binding = "DB"
 database_name = "andromeda-tv-db"
-database_id = "local-dev-id" # Update upon real deployment
+database_id = "a0f35a4c-645b-491a-ac8f-71a6cac432bb"
+migrations_dir = "drizzle"
+
+[env.production]
+routes = [
+  { pattern = "andromeda.nixlabs.tech", custom_domain = true }
+]
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "andromeda-tv-db"
+database_id = "a0f35a4c-645b-491a-ac8f-71a6cac432bb"
+migrations_dir = "drizzle"

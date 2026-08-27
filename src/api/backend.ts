@@ -21,9 +21,7 @@ export interface LiveStream {
   links: string; // JSON array of links
 }
 
-// In development, this points to our local wrangler dev server. 
-// In production, this will point to our deployed Cloudflare Worker URL.
-const BACKEND_URL = 'http://127.0.0.1:8787';
+const BACKEND_URL = 'https://andromeda.nixlabs.tech';
 
 export const fetchMovies = async (page = 1, limit = 50): Promise<Movie[]> => {
   try {

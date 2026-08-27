@@ -18,6 +18,13 @@ app.use('/*', cors({
 
 // Routes
 app.get('/api/health', (c) => c.json({ status: 'online' }));
+app.get('/api/sync', async (c) => {
+  const db = drizzle(c.env.DB);
+  const tmdbService = new TMDBService(c.env.TMDB_READ_ACCESS_TOKEN);
+  const syncService = new SyncService(db, tmdbService);
+  c.executionCtx.waitUntil(syncService.runGlobalSync());
+  return c.json({ success: true, message: 'Sync started in background' });
+});
 app.route('/api/vod', vodRouter);
 app.route('/api/live', liveRouter);
 
