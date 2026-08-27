@@ -51,7 +51,7 @@ function App() {
 
         {/* Top Bar (Search & Notifications) */}
         <header className="relative z-10 flex justify-between items-center px-12 py-8">
-          <h1 className="text-2xl font-bold tracking-tight">StreamFlow</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Andromeda TV</h1>
           
           <div className="flex items-center gap-6">
             <div className="flex items-center bg-black/40 backdrop-blur-md border border-white/10 rounded-full px-4 py-2 w-80">
