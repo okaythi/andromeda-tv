@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { db } from '../db';
 import { movies, series } from '../schema';
-import { eq } from 'drizzle-orm';
+import { eq, count } from 'drizzle-orm';
 
 const vodRouter = new Hono();
 
@@ -26,16 +26,26 @@ vodRouter.get('/home', async (c) => {
 vodRouter.get('/movies', async (c) => {
   const page = Number(c.req.query('page')) || 1;
   const pageSize = Number(c.req.query('limit')) || 50;
+  const category = c.req.query('category');
   
-  const results = await db.select()
-    .from(movies)
+  let baseQuery = db.select().from(movies);
+  let countQuery = db.select({ value: count() }).from(movies);
+  
+  if (category) {
+    baseQuery = db.select().from(movies).where(eq(movies.category, category)) as any;
+    countQuery = db.select({ value: count() }).from(movies).where(eq(movies.category, category)) as any;
+  }
+  
+  const results = await baseQuery
     .limit(pageSize)
     .offset((page - 1) * pageSize);
+    
+  const [{ value: totalCount }] = await countQuery;
     
   return c.json({
     page,
     limit: pageSize,
-    total: results.length, // Should use a count query for absolute total
+    total: totalCount,
     movies: results
   });
 });
@@ -43,16 +53,26 @@ vodRouter.get('/movies', async (c) => {
 vodRouter.get('/series', async (c) => {
   const page = Number(c.req.query('page')) || 1;
   const pageSize = Number(c.req.query('limit')) || 50;
+  const category = c.req.query('category');
   
-  const results = await db.select()
-    .from(series)
+  let baseQuery = db.select().from(series);
+  let countQuery = db.select({ value: count() }).from(series);
+  
+  if (category) {
+    baseQuery = db.select().from(series).where(eq(series.category, category)) as any;
+    countQuery = db.select({ value: count() }).from(series).where(eq(series.category, category)) as any;
+  }
+  
+  const results = await baseQuery
     .limit(pageSize)
     .offset((page - 1) * pageSize);
+    
+  const [{ value: totalCount }] = await countQuery;
     
   return c.json({
     page,
     limit: pageSize,
-    total: results.length,
+    total: totalCount,
     series: results
   });
 });

@@ -138,7 +138,7 @@ export class BrazucaParser {
     return out;
   }
 
-  public async fetchVod(url: string, category: string, contentType: string, idPrefix = 'vod_'): Promise<ParsedItem[]> {
+  public async fetchVod(url: string, category: string, contentType: string, idPrefix = 'vod_', startIndex = 0): Promise<ParsedItem[]> {
     const itemsOut: ParsedItem[] = [];
     try {
       const resp = await fetch(url);
@@ -149,10 +149,18 @@ export class BrazucaParser {
       
       for (const item of items) {
         const rawName = cleanTitle(item.name || item.title);
-        // Better UTF-8 support now, no more hardcoded encoding gore
-        if (!rawName || rawName.toUpperCase().includes('PRÓXIMA PÁGINA') || rawName.toUpperCase().includes('PRÃ“XIMA PÃ GINA')) continue;
+        if (!rawName) continue;
 
         const linkVal = typeof item.externallink === 'string' ? item.externallink.trim() : (typeof item.link === 'string' ? item.link.trim() : '');
+
+        if (rawName.toUpperCase().includes('PRÓXIMA PÁGINA') || rawName.toUpperCase().includes('PRÃ“XIMA PÃ GINA')) {
+          if (linkVal) {
+             const nextItems = await this.fetchVod(linkVal, category, contentType, idPrefix, startIndex + itemsOut.length);
+             itemsOut.push(...nextItems);
+          }
+          continue;
+        }
+
         const thumbVal = decodePoster(item.thumbnail || item.poster || item.img);
         const fanartVal = decodePoster(item.fanart || item.backdrop || item.cover) || thumbVal;
         const infoVal = cleanTitle(item.info);
@@ -167,7 +175,7 @@ export class BrazucaParser {
 
         if (finalId) {
           const parsed = ParsedItemSchema.safeParse({
-            id: `${idPrefix}${itemsOut.length + 1}`,
+            id: `${idPrefix}${startIndex + itemsOut.length + 1}`,
             name: rawName,
             thumb: thumbVal,
             fanart: fanartVal,

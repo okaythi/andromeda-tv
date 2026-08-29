@@ -120,7 +120,17 @@ export class BrazucaParser {
         const nameM = itemStr.match(/<(?:name|title)>([\s\S]*?)<\/(?:name|title)>/);
         if (!nameM || !nameM[1]) continue;
         const rawName = cleanTitle(nameM[1]);
-        if (!rawName || rawName.toUpperCase().includes('PRÓXIMA PÁGINA')) continue;
+        if (!rawName) continue;
+
+        if (rawName.toUpperCase().includes('PRÓXIMA PÁGINA') || rawName.toUpperCase().includes('PRÃ“XIMA PÃ GINA')) {
+          const linkM = itemStr.match(/<(?:externallink|link)>([\s\S]*?)<\/(?:externallink|link)>/);
+          const linkVal = (linkM && linkM[1]) ? linkM[1].trim() : '';
+          if (linkVal) {
+            const nextItems = await this.fetchVod(linkVal, category, contentType, startId + itemsOut.length);
+            itemsOut.push(...nextItems);
+          }
+          continue;
+        }
 
         const linkM = itemStr.match(/<(?:externallink|link)>([\s\S]*?)<\/(?:externallink|link)>/);
         const linkVal = (linkM && linkM[1]) ? linkM[1].trim() : '';
