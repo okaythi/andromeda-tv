@@ -135,6 +135,8 @@ export class BrazucaParser {
         const linkM = itemStr.match(/<(?:externallink|link)>([\s\S]*?)<\/(?:externallink|link)>/);
         const linkVal = (linkM && linkM[1]) ? linkM[1].trim() : '';
         
+        if (!linkVal || linkVal.toLowerCase() === 'here') continue;
+
         const thumbM = itemStr.match(/<(?:thumbnail|poster|img)>([\s\S]*?)<\/(?:thumbnail|poster|img)>/);
         const thumbVal = decodePoster((thumbM && thumbM[1]) ? thumbM[1].trim() : '');
         

@@ -161,6 +161,8 @@ export class BrazucaParser {
           continue;
         }
 
+        if (!linkVal || linkVal.toLowerCase() === 'here') continue;
+
         const thumbVal = decodePoster(item.thumbnail || item.poster || item.img);
         const fanartVal = decodePoster(item.fanart || item.backdrop || item.cover) || thumbVal;
         const infoVal = cleanTitle(item.info);
