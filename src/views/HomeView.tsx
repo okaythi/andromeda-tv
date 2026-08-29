@@ -9,9 +9,10 @@ interface HomeViewProps {
   homeData: HomeData | null;
   channels: LiveStream[];
   onViewAllChannels: () => void;
+  onViewCategory: (title: string, movies: Movie[]) => void;
 }
 
-export function HomeView({ homeData, channels, onViewAllChannels }: HomeViewProps) {
+export function HomeView({ homeData, channels, onViewAllChannels, onViewCategory }: HomeViewProps) {
   // Safe defaults if still loading
   const categories = useMemo(() => {
     if (!homeData) return [];
@@ -62,6 +63,7 @@ export function HomeView({ homeData, channels, onViewAllChannels }: HomeViewProp
             key={cat.title} 
             title={cat.title} 
             movies={cat.movies.filter(m => m.id !== heroMovie.id)} 
+            onViewMore={() => onViewCategory(cat.title, cat.movies)}
           />
         ))}
       </div>
