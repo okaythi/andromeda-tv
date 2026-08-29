@@ -9,7 +9,7 @@ interface HomeViewProps {
   homeData: HomeData | null;
   channels: LiveStream[];
   onViewAllChannels: () => void;
-  onViewCategory: (title: string, movies: Movie[]) => void;
+  onViewCategory: (title: string, categoryFilter: string | undefined, isSeries: boolean, initialMovies: Movie[]) => void;
 }
 
 export function HomeView({ homeData, channels, onViewAllChannels, onViewCategory }: HomeViewProps) {
@@ -18,10 +18,10 @@ export function HomeView({ homeData, channels, onViewAllChannels, onViewCategory
     if (!homeData) return [];
     
     return [
-      { title: 'Filmes Populares', movies: homeData.popular_movies },
-      { title: 'Séries em Alta', movies: homeData.popular_series },
-      { title: 'Animes', movies: homeData.animes },
-      { title: 'Doramas', movies: homeData.doramas }
+      { title: 'Filmes Populares', movies: homeData.popular_movies, categoryFilter: undefined, isSeries: false },
+      { title: 'Séries em Alta', movies: homeData.popular_series, categoryFilter: 'Séries', isSeries: true },
+      { title: 'Animes', movies: homeData.animes, categoryFilter: 'Animes', isSeries: true },
+      { title: 'Doramas', movies: homeData.doramas, categoryFilter: 'Doramas', isSeries: true }
     ].filter(cat => cat.movies.length > 0);
   }, [homeData]);
 
@@ -63,7 +63,7 @@ export function HomeView({ homeData, channels, onViewAllChannels, onViewCategory
             key={cat.title} 
             title={cat.title} 
             movies={cat.movies.filter(m => m.id !== heroMovie.id)} 
-            onViewMore={() => onViewCategory(cat.title, cat.movies)}
+            onViewMore={() => onViewCategory(cat.title, cat.categoryFilter, cat.isSeries, cat.movies)}
           />
         ))}
       </div>

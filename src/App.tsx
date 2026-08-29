@@ -8,7 +8,7 @@ import { MoviesGrid } from './views/MoviesGrid';
 export type AppView = 
   | { type: 'home' } 
   | { type: 'channels' }
-  | { type: 'category'; title: string; movies: Movie[] };
+  | { type: 'category'; title: string; categoryFilter: string | undefined; isSeries: boolean; initialMovies: Movie[] };
 
 function App() {
   const [homeData, setHomeData] = useState<HomeData | null>(null);
@@ -38,7 +38,7 @@ function App() {
             homeData={homeData}
             channels={channels}
             onViewAllChannels={() => setCurrentView({ type: 'channels' })}
-            onViewCategory={(title, movies) => setCurrentView({ type: 'category', title, movies })}
+            onViewCategory={(title, categoryFilter, isSeries, initialMovies) => setCurrentView({ type: 'category', title, categoryFilter, isSeries, initialMovies })}
           />
         </div>
         <div className={`absolute inset-0 overflow-y-auto hide-scrollbar ${currentView.type === 'channels' ? 'block' : 'hidden'}`}>
@@ -51,7 +51,9 @@ function App() {
           {currentView.type === 'category' && (
             <MoviesGrid
               title={currentView.title}
-              movies={currentView.movies}
+              categoryFilter={currentView.categoryFilter}
+              isSeries={currentView.isSeries}
+              initialMovies={currentView.initialMovies}
               onBack={() => setCurrentView({ type: 'home' })}
             />
           )}
