@@ -63,7 +63,7 @@ export function MoviesGrid({ title, categoryFilter, isSeries, initialMovies, onB
         <span className="font-medium">Voltar</span>
       </button>
 
-      <h2 className="text-3xl font-bold mb-8 capitalize">{title} <span className="text-xl text-gray-500 font-normal ml-2">({total} items)</span></h2>
+      <h2 className="text-3xl font-bold mb-8 capitalize">{title} <span className="text-xl text-gray-500 font-normal ml-2">({total} itens)</span></h2>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
         {movies.map((m, i) => (
