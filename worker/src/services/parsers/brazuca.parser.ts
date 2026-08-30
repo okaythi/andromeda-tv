@@ -122,7 +122,7 @@ export class BrazucaParser {
         const rawName = cleanTitle(nameM[1]);
         if (!rawName) continue;
 
-        if (rawName.toUpperCase().includes('PRÓXIMA PÁGINA') || rawName.toUpperCase().includes('PRÃ“XIMA PÃ GINA')) {
+        if (rawName.toUpperCase().includes('PRÓXIMA') || rawName.toUpperCase().includes('PRÃ“XIMA')) {
           const linkM = itemStr.match(/<(?:externallink|link)>([\s\S]*?)<\/(?:externallink|link)>/);
           const linkVal = (linkM && linkM[1]) ? linkM[1].trim() : '';
           if (linkVal) {

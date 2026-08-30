@@ -153,7 +153,7 @@ export class BrazucaParser {
 
         const linkVal = typeof item.externallink === 'string' ? item.externallink.trim() : (typeof item.link === 'string' ? item.link.trim() : '');
 
-        if (rawName.toUpperCase().includes('PRÓXIMA PÁGINA') || rawName.toUpperCase().includes('PRÃ“XIMA PÃ GINA')) {
+        if (rawName.toUpperCase().includes('PRÓXIMA') || rawName.toUpperCase().includes('PRÃ“XIMA')) {
           if (linkVal) {
              const nextItems = await this.fetchVod(linkVal, category, contentType, idPrefix, startIndex + itemsOut.length);
              itemsOut.push(...nextItems);
