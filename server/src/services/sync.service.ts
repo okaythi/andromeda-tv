@@ -55,13 +55,16 @@ export class SyncService {
     this.updateState({ isSyncing: true, lastError: null });
 
     try {
-      const [accounts, brazucaChannels, vodCatalogs] = await Promise.all([
-        this.oneplay.syncOnePlayAccounts(),
+      const accounts = await this.oneplay.syncOnePlayAccounts().catch((e) => {
+        console.warn('[SyncService] OnePlay account discovery warning:', e.message);
+        return {} as Record<string, any>;
+      });
+
+      const [brazucaChannels, vodCatalogs, onePlayVod] = await Promise.all([
         this.brazuca.fetchChannels(`${GIST_BASE}channels.xml`),
         Promise.all(BRAZUCA_FEEDS.map(f => this.brazuca.fetchVod(f.url, f.category, f.type, f.prefix))),
+        Object.keys(accounts).length > 0 ? this.oneplay.fetchVod(accounts) : Promise.resolve({ movies: [], series: [] })
       ]);
-
-      const onePlayVod = await this.oneplay.fetchVod(accounts);
 
       const [lancamentos = [], filmes = [], animes = [], doramas = [], brazucaSeries = []] = vodCatalogs;
       const allMovies = [...lancamentos, ...filmes, ...onePlayVod.movies];

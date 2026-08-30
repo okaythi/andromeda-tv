@@ -50,8 +50,18 @@ export class OnePlayParser {
           const testUrl = `${baseUrl}/player_api.php?username=${user}&password=${pwd}`;
           const tResp = await fetch(testUrl);
           if (tResp.ok) {
-            accounts[`master_${user}`] = { baseUrl, user, pass: pwd };
-            console.log(`[OnePlay] Active server detected: ${baseUrl} (${user})`);
+            const text = await tResp.text();
+            if (text.trim().startsWith('{')) {
+              try {
+                const j = JSON.parse(text);
+                if (j && (j.user_info || j.server_info || j.auth === 1)) {
+                  accounts[`master_${user}`] = { baseUrl, user, pass: pwd };
+                  console.log(`[OnePlay] Active server detected: ${baseUrl} (${user})`);
+                }
+              } catch {
+                // Ignore
+              }
+            }
           }
         }
       } catch (e) {
