@@ -25,18 +25,24 @@ export function HomeView({ homeData, channels, onViewAllChannels, onViewCategory
     ].filter(cat => cat.movies.length > 0);
   }, [homeData]);
 
-  // Use the first popular movie as Hero, or fallback to mock
-  const heroMovie = homeData?.popular_movies?.[0] || {
-    id: 'mock',
-    internalId: 'mock',
-    title: 'Sons em Órbita',
-    overview: 'Uma série de ficção científica envolvente.',
-    posterUrl: 'https://images.unsplash.com/photo-1618172193622-ae2d025f4032?q=80&w=400&auto=format&fit=crop',
-    backdropUrl: 'https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?q=80&w=2072&auto=format&fit=crop',
-    category: 'Ficção Científica',
-    rating: '8.0',
-    tmdbId: null
-  } as Movie;
+  // Pick the first movie with a real TMDB backdrop as hero
+  const heroMovie = useMemo(() => {
+    const candidates = homeData?.popular_movies ?? [];
+    const enriched = candidates.find(m => 
+      m.backdropUrl?.includes('image.tmdb.org') && m.internalId !== 'here'
+    );
+    return enriched ?? candidates.find(m => m.internalId !== 'here') ?? {
+      id: 'mock',
+      internalId: 'mock',
+      title: 'Sons em Órbita',
+      overview: 'Uma série de ficção científica envolvente.',
+      posterUrl: 'https://images.unsplash.com/photo-1618172193622-ae2d025f4032?q=80&w=400&auto=format&fit=crop',
+      backdropUrl: 'https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?q=80&w=2072&auto=format&fit=crop',
+      category: 'Ficção Científica',
+      rating: '8.0',
+      tmdbId: null
+    } as Movie;
+  }, [homeData]);
 
   const displayChannels = channels.length > 0 ? channels : Array(12).fill({
     id: 'mock',

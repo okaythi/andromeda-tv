@@ -1,22 +1,41 @@
 import { Hono } from 'hono';
 import { db } from '../db';
 import { movies, series } from '../schema';
-import { eq, count } from 'drizzle-orm';
+import { eq, ne, and, count } from 'drizzle-orm';
 
 const vodRouter = new Hono();
 
 vodRouter.get('/home', async (c) => {
-  // Fetch a mix of categories to populate the home page carousels
-  const lancamentos = await db.select().from(movies).where(eq(movies.category, 'Lançamentos')).limit(20);
-  const filmes = await db.select().from(movies).where(eq(movies.category, 'Filmes')).limit(20);
-  const populares = await db.select().from(movies).limit(20);
+  // Fetch categories, excluding non-playable header items (internalId='here')
+  const lancamentos = await db.select().from(movies)
+    .where(and(eq(movies.category, 'Lançamentos'), ne(movies.internalId, 'here')))
+    .limit(20);
+  const filmes = await db.select().from(movies)
+    .where(and(eq(movies.category, 'Filmes'), ne(movies.internalId, 'here')))
+    .limit(20);
   
-  const popularSeries = await db.select().from(series).where(eq(series.category, 'Séries')).limit(20);
-  const animes = await db.select().from(series).where(eq(series.category, 'Animes')).limit(20);
-  const doramas = await db.select().from(series).where(eq(series.category, 'Doramas')).limit(20);
+  const popularSeries = await db.select().from(series)
+    .where(and(eq(series.category, 'Séries'), ne(series.internalId, 'here')))
+    .limit(20);
+  const animes = await db.select().from(series)
+    .where(and(eq(series.category, 'Animes'), ne(series.internalId, 'here')))
+    .limit(20);
+  const doramas = await db.select().from(series)
+    .where(and(eq(series.category, 'Doramas'), ne(series.internalId, 'here')))
+    .limit(20);
+
+  // Deduplicate popular_movies: lancamentos first, then filmes (skip dupes)
+  const seenIds = new Set<string>();
+  const popularMovies: typeof lancamentos = [];
+  for (const m of [...lancamentos, ...filmes]) {
+    if (!seenIds.has(m.id)) {
+      seenIds.add(m.id);
+      popularMovies.push(m);
+    }
+  }
 
   return c.json({
-    popular_movies: [...lancamentos, ...filmes, ...populares],
+    popular_movies: popularMovies,
     popular_series: popularSeries,
     animes: animes,
     doramas: doramas,
@@ -28,19 +47,16 @@ vodRouter.get('/movies', async (c) => {
   const pageSize = Number(c.req.query('limit')) || 50;
   const category = c.req.query('category');
   
-  let baseQuery = db.select().from(movies);
-  let countQuery = db.select({ value: count() }).from(movies);
+  const baseFilter = ne(movies.internalId, 'here');
+  const whereClause = category ? and(baseFilter, eq(movies.category, category)) : baseFilter;
   
-  if (category) {
-    baseQuery = db.select().from(movies).where(eq(movies.category, category)) as any;
-    countQuery = db.select({ value: count() }).from(movies).where(eq(movies.category, category)) as any;
-  }
-  
-  const results = await baseQuery
+  const results = await db.select().from(movies)
+    .where(whereClause)
     .limit(pageSize)
     .offset((page - 1) * pageSize);
     
-  const [{ value: totalCount }] = await countQuery;
+  const [{ value: totalCount }] = await db.select({ value: count() }).from(movies)
+    .where(whereClause);
     
   return c.json({
     page,
@@ -55,19 +71,16 @@ vodRouter.get('/series', async (c) => {
   const pageSize = Number(c.req.query('limit')) || 50;
   const category = c.req.query('category');
   
-  let baseQuery = db.select().from(series);
-  let countQuery = db.select({ value: count() }).from(series);
+  const baseFilter = ne(series.internalId, 'here');
+  const whereClause = category ? and(baseFilter, eq(series.category, category)) : baseFilter;
   
-  if (category) {
-    baseQuery = db.select().from(series).where(eq(series.category, category)) as any;
-    countQuery = db.select({ value: count() }).from(series).where(eq(series.category, category)) as any;
-  }
-  
-  const results = await baseQuery
+  const results = await db.select().from(series)
+    .where(whereClause)
     .limit(pageSize)
     .offset((page - 1) * pageSize);
     
-  const [{ value: totalCount }] = await countQuery;
+  const [{ value: totalCount }] = await db.select({ value: count() }).from(series)
+    .where(whereClause);
     
   return c.json({
     page,
