@@ -122,18 +122,21 @@ export class BrazucaParser {
         const rawName = cleanTitle(nameM[1]);
         if (!rawName) continue;
 
-        if (rawName.toUpperCase().includes('PRÓXIMA') || rawName.toUpperCase().includes('PRÃ“XIMA')) {
-          const linkM = itemStr.match(/<(?:externallink|link)>([\s\S]*?)<\/(?:externallink|link)>/);
-          const linkVal = (linkM && linkM[1]) ? linkM[1].trim() : '';
-          if (linkVal) {
-            const nextItems = await this.fetchVod(linkVal, category, contentType, startId + itemsOut.length);
-            itemsOut.push(...nextItems);
-          }
-          continue;
-        }
-
         const linkM = itemStr.match(/<(?:externallink|link)>([\s\S]*?)<\/(?:externallink|link)>/);
         const linkVal = (linkM && linkM[1]) ? linkM[1].trim() : '';
+
+        const isPagination = linkVal.startsWith('http') && (
+          rawName.toUpperCase().includes('PRÓXIMA PÁGINA') ||
+          rawName.toUpperCase().includes('PRÃ“XIMA PÃ GINA') ||
+          rawName.toUpperCase().includes('PROXIMA PAGINA') ||
+          /pr[óoã\w]*xima\s+p[áaã\w]*g/i.test(rawName)
+        );
+
+        if (isPagination) {
+          const nextItems = await this.fetchVod(linkVal, category, contentType, startId + itemsOut.length);
+          itemsOut.push(...nextItems);
+          continue;
+        }
         
         if (!linkVal || linkVal.toLowerCase() === 'here') continue;
 

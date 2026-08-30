@@ -1,6 +1,7 @@
 
 import { Play, Plus } from 'lucide-react';
 import type { Movie } from '../api/backend';
+import { getOptimizedImageUrl } from '../utils/image';
 
 interface HeroSectionProps {
   movie?: Movie;
@@ -9,13 +10,22 @@ interface HeroSectionProps {
 export function HeroSection({ movie }: HeroSectionProps) {
   if (!movie) return null;
 
+  const fallbackBackdrop = 'https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?q=80&w=2072&auto=format&fit=crop';
+  const backdropSrc = getOptimizedImageUrl(movie.backdropUrl, fallbackBackdrop);
+
   return (
     <>
       {/* Hero Background Image */}
       <div className="absolute top-0 left-0 w-full h-[70vh] z-0">
         <img
-          src={movie.backdropUrl || 'https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?q=80&w=2072&auto=format&fit=crop'}
-          alt="Fundo Hero"
+          src={backdropSrc}
+          alt={movie.title || 'Fundo Hero'}
+          onError={(e) => {
+            const target = e.currentTarget;
+            if (target.src !== fallbackBackdrop) {
+              target.src = fallbackBackdrop;
+            }
+          }}
           className="w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-[#0A0A0A] via-[#0A0A0A]/80 to-transparent" />

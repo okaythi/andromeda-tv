@@ -1,5 +1,6 @@
 
 import { Home, Compass, Users, User, Play } from 'lucide-react';
+import { DevTools } from './DevTools';
 
 export type ViewType = 'home' | 'channels';
 
@@ -42,6 +43,10 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
           <span className="text-[10px] font-medium">Perfil</span>
         </button>
       </nav>
+
+      <div className="mt-auto">
+        <DevTools />
+      </div>
     </aside>
   );
 }

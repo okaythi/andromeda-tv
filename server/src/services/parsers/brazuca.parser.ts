@@ -153,11 +153,16 @@ export class BrazucaParser {
 
         const linkVal = typeof item.externallink === 'string' ? item.externallink.trim() : (typeof item.link === 'string' ? item.link.trim() : '');
 
-        if (rawName.toUpperCase().includes('PRÓXIMA') || rawName.toUpperCase().includes('PRÃ“XIMA')) {
-          if (linkVal) {
-             const nextItems = await this.fetchVod(linkVal, category, contentType, idPrefix, startIndex + itemsOut.length);
-             itemsOut.push(...nextItems);
-          }
+        const isPagination = linkVal.startsWith('http') && (
+          rawName.toUpperCase().includes('PRÓXIMA PÁGINA') ||
+          rawName.toUpperCase().includes('PRÃ“XIMA PÃ GINA') ||
+          rawName.toUpperCase().includes('PROXIMA PAGINA') ||
+          /pr[óoã\w]*xima\s+p[áaã\w]*g/i.test(rawName)
+        );
+
+        if (isPagination) {
+          const nextItems = await this.fetchVod(linkVal, category, contentType, idPrefix, startIndex + itemsOut.length);
+          itemsOut.push(...nextItems);
           continue;
         }
 

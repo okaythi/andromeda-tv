@@ -1,6 +1,7 @@
 
 import { Eye } from 'lucide-react';
 import type { LiveStream } from '../api/backend';
+import { getOptimizedImageUrl } from '../utils/image';
 
 interface ChannelCardProps {
   channel: LiveStream;
@@ -14,12 +15,21 @@ export function ChannelCard({ channel, index, layout = 'row' }: ChannelCardProps
     ? 'w-full h-[160px] rounded-2xl overflow-hidden relative mb-3'
     : 'w-full aspect-video rounded-2xl overflow-hidden relative mb-3';
 
+  const fallbackUrl = `https://images.unsplash.com/photo-1541873676-a18131494184?q=80&w=600&auto=format&fit=crop&sig=${index}`;
+  const logoSrc = getOptimizedImageUrl(channel.logoUrl, fallbackUrl);
+
   return (
     <div className={containerClass}>
       <div className={imageContainerClass}>
         <img
-          src={channel.logoUrl || `https://images.unsplash.com/photo-1541873676-a18131494184?q=80&w=600&auto=format&fit=crop&sig=${index}`}
-          alt="Miniatura"
+          src={logoSrc}
+          alt={channel.name || 'Miniatura'}
+          onError={(e) => {
+            const target = e.currentTarget;
+            if (target.src !== fallbackUrl) {
+              target.src = fallbackUrl;
+            }
+          }}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 bg-gray-900"
         />
         {/* Live Badge */}
