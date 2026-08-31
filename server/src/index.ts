@@ -2,8 +2,9 @@ import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { streamSSE } from 'hono/streaming';
-import { vodRouter } from './routes/vod.routes';
+import { createVodRouter } from './routes/vod.routes';
 import { liveRouter } from './routes/live.routes';
+import { searchRouter } from './routes/search.routes';
 import { SyncService, type SyncState } from './services/sync.service';
 import { TMDBService } from './services/tmdb.service';
 import { db } from './db';
@@ -50,8 +51,9 @@ app.get('/api/sync/status', (c) => {
   });
 });
 
-app.route('/api/vod', vodRouter);
+app.route('/api/vod', createVodRouter(tmdbService));
 app.route('/api/live', liveRouter);
+app.route('/api/search', searchRouter);
 
 const port = process.env['PORT'] ? parseInt(process.env['PORT']) : 3000;
 console.log(`Server is running on port ${port}`);

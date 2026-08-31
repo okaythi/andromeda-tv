@@ -1,33 +1,34 @@
-
 import { ArrowRight } from 'lucide-react';
-import type { Movie } from '../api/backend';
+import type { TitleSummary } from '../../shared/catalog';
 import { MovieCard } from './MovieCard';
 
 interface CategoryRowProps {
   title: string;
-  movies: Movie[];
-  onViewMore: () => void;
+  titles: TitleSummary[];
+  onViewMore: (trigger: HTMLElement) => void;
+  onOpenTitle: (title: TitleSummary, trigger: HTMLElement) => void;
 }
 
-export function CategoryRow({ title, movies, onViewMore }: CategoryRowProps) {
-  if (movies.length === 0) return null;
+export function CategoryRow({ title, titles, onViewMore, onOpenTitle }: CategoryRowProps) {
+  if (titles.length === 0) return null;
 
   return (
-    <section>
-      <div 
-        className="flex items-center mb-4 group cursor-pointer w-max"
-        onClick={onViewMore}
+    <section aria-labelledby={`category-${title}`}>
+      <button
+        type="button"
+        onClick={(event) => onViewMore(event.currentTarget)}
+        className="group mb-4 flex items-center text-left focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
       >
-        <h3 className="text-xl font-semibold capitalize">{title}</h3>
-        <div className="mx-3 w-1.5 h-1.5 rounded-full bg-gray-600" />
-        <span className="flex items-center gap-1 text-sm text-[#E5E5E5] group-hover:text-white transition-colors">
+        <h2 id={`category-${title}`} className="text-xl font-semibold text-white">{title}</h2>
+        <span className="mx-3 h-1.5 w-1.5 rounded-full bg-zinc-600" aria-hidden="true" />
+        <span className="flex items-center gap-1 text-sm text-zinc-300 transition group-hover:text-white">
           Ver mais
-          <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+          <ArrowRight size={16} className="transition group-hover:translate-x-1" aria-hidden="true" />
         </span>
-      </div>
-      <div className="flex gap-4 overflow-x-auto hide-scrollbar pb-4 -mx-12 px-12">
-        {movies.map((m, i) => (
-          <MovieCard key={m.id + i} movie={m} index={i} />
+      </button>
+      <div className="-mx-5 flex gap-4 overflow-x-auto px-5 pb-5 sm:-mx-12 sm:px-12">
+        {titles.map((item) => (
+          <MovieCard key={`${item.mediaType}:${item.id}`} title={item} onOpen={onOpenTitle} />
         ))}
       </div>
     </section>

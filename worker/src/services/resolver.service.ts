@@ -1,69 +1,78 @@
-export class ResolverService {
-  constructor(private readonly _geekToken: string) {}
+interface OnePlayAccount {
+  baseUrl: string;
+  user: string;
+  pass: string;
+}
 
-  public async resolveLink(internalId: string, resolverType: number = 2): Promise<string> {
+function parseRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function parseOnePlayAccount(value: unknown): OnePlayAccount | null {
+  const record = parseRecord(value);
+  if (!record) return null;
+
+  const baseUrl = record['baseUrl'];
+  const user = record['user'];
+  const pass = record['pass'];
+  return typeof baseUrl === 'string' && typeof user === 'string' && typeof pass === 'string'
+    ? { baseUrl, user, pass }
+    : null;
+}
+
+function parseResolverResult(value: unknown): string | null {
+  const record = parseRecord(value);
+  const result = record?.['result'];
+  return typeof result === 'string' && result.trim().length > 0 ? result : null;
+}
+
+export class ResolverService {
+  public constructor(private readonly geekToken: string) {}
+
+  public async resolveLink(internalId: string, resolverType = 2): Promise<string> {
     const raw = internalId.trim();
 
-    // OnePlay Movie
-    if (raw.startsWith('opmovie#')) {
-      const parts = raw.split('#');
-      if (parts.length >= 4) {
-        try {
-          const accJson = atob(parts[1] as string);
-          const acc = JSON.parse(accJson);
-          return `${acc.baseUrl}/movie/${acc.user}/${acc.pass}/${parts[2]}.${parts[3]}`;
-        } catch (e) {
-          return raw;
-        }
-      }
-    }
+    const onePlayUrl = this.resolveOnePlayUrl(raw);
+    if (onePlayUrl) return onePlayUrl;
 
-    // OnePlay Series
-    if (raw.startsWith('opseries#')) {
-      const parts = raw.split('#');
-      if (parts.length >= 4) {
-        try {
-          const accJson = atob(parts[1] as string);
-          const acc = JSON.parse(accJson);
-          return `${acc.baseUrl}/series/${acc.user}/${acc.pass}/${parts[2]}.${parts[3]}`;
-        } catch (e) {
-          return raw;
-        }
-      }
-    }
+    if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
 
-    // Direct URL
-    if (raw.startsWith('http://') || raw.startsWith('https://')) {
+    try {
+      const payload = btoa(JSON.stringify({ resolver: resolverType, request: raw }));
+      const response = await fetch(`https://api.geekantenado.online/?resolver=${encodeURIComponent(payload)}`, {
+        headers: {
+          Authorization: `Bearer ${this.geekToken}`,
+          'User-Agent': 'Mozilla/5.0',
+        },
+      });
+      if (!response.ok) return raw;
+
+      const encodedResult = parseResolverResult(await response.json() as unknown);
+      if (!encodedResult) return raw;
+      const streamUrl = atob(encodedResult).trim();
+      return streamUrl.startsWith('http') ? streamUrl : raw;
+    } catch (error: unknown) {
+      console.error('[Resolver] Error:', error);
       return raw;
     }
+  }
 
-    // GeekAntenado API Resolver
+  private resolveOnePlayUrl(raw: string): string | null {
+    const parts = raw.split('#');
+    if (parts.length < 4 || (parts[0] !== 'opmovie' && parts[0] !== 'opseries')) return null;
+
     try {
-      const paramsObj = { resolver: resolverType, request: raw };
-      const paramsStr = JSON.stringify(paramsObj);
-      const b64Payload = btoa(paramsStr);
-      const apiUrl = `https://api.geekantenado.online/?resolver=${encodeURIComponent(b64Payload)}`;
+      const account = parseOnePlayAccount(JSON.parse(atob(parts[1] ?? '')) as unknown);
+      const streamId = parts[2];
+      const extension = parts[3];
+      if (!account || !streamId || !extension) return null;
 
-      const response = await fetch(apiUrl, {
-        headers: {
-          'Authorization': `Bearer ${this._geekToken}`,
-          'User-Agent': 'Mozilla/5.0'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json() as any;
-        if (data && data.result) {
-          const streamUrl = atob(data.result).trim();
-          if (streamUrl.startsWith('http')) {
-            return streamUrl;
-          }
-        }
-      }
-    } catch (e) {
-      console.error('[Resolver] Error:', e);
+      const path = parts[0] === 'opmovie' ? 'movie' : 'series';
+      return `${account.baseUrl}/${path}/${account.user}/${account.pass}/${streamId}.${extension}`;
+    } catch {
+      return null;
     }
-
-    return raw;
   }
 }

@@ -1,50 +1,45 @@
-
-import { Eye } from 'lucide-react';
-import type { LiveStream } from '../api/backend';
-import { getOptimizedImageUrl } from '../utils/image';
+import { Radio } from 'lucide-react';
+import type { ChannelSummary } from '../../shared/catalog';
+import { Artwork } from './Artwork';
 
 interface ChannelCardProps {
-  channel: LiveStream;
-  index: number;
+  channel: ChannelSummary;
   layout?: 'row' | 'grid';
+  onOpen: (channel: ChannelSummary, trigger: HTMLElement) => void;
 }
 
-export function ChannelCard({ channel, index, layout = 'row' }: ChannelCardProps) {
-  const containerClass = layout === 'row' ? 'min-w-[280px] group cursor-pointer' : 'group cursor-pointer';
-  const imageContainerClass = layout === 'row' 
-    ? 'w-full h-[160px] rounded-2xl overflow-hidden relative mb-3'
-    : 'w-full aspect-video rounded-2xl overflow-hidden relative mb-3';
-
-  const fallbackUrl = `https://images.unsplash.com/photo-1541873676-a18131494184?q=80&w=600&auto=format&fit=crop&sig=${index}`;
-  const logoSrc = getOptimizedImageUrl(channel.logoUrl, fallbackUrl);
+export function ChannelCard({ channel, layout = 'row', onOpen }: ChannelCardProps) {
+  const imageContainerClass = layout === 'row'
+    ? 'h-[150px]'
+    : 'aspect-video';
 
   return (
-    <div className={containerClass}>
-      <div className={imageContainerClass}>
-        <img
-          src={logoSrc}
-          alt={channel.name || 'Miniatura'}
-          onError={(e) => {
-            const target = e.currentTarget;
-            if (target.src !== fallbackUrl) {
-              target.src = fallbackUrl;
-            }
-          }}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 bg-gray-900"
-        />
-        {/* Live Badge */}
-        <div className="absolute top-2 right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1">
-          <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-          AO VIVO
+    <article className={layout === 'row' ? 'group min-w-[250px]' : 'group'}>
+      <button
+        type="button"
+        onClick={(event) => onOpen(channel, event.currentTarget)}
+        className="block w-full text-left transition duration-200 hover:-translate-y-1 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
+        aria-label={`Abrir canal ${channel.name}`}
+      >
+        <div className={`relative overflow-hidden rounded-2xl bg-zinc-900 ${imageContainerClass}`}>
+          <Artwork
+            src={channel.logoUrl}
+            alt={`Logo de ${channel.name}`}
+            aspect="logo"
+            className="transition duration-300 group-hover:scale-105"
+          />
+          {channel.isPlayable && (
+            <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-md bg-red-500 px-2 py-1 text-[10px] font-bold tracking-wide text-white">
+              <Radio size={11} aria-hidden="true" />
+              AO VIVO
+            </span>
+          )}
         </div>
-        {/* Viewers */}
-        <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-md text-white text-[10px] font-medium px-2 py-1 rounded flex items-center gap-1">
-          <Eye size={12} />
-          {Math.floor(Math.random() * 20 + 1)},{Math.floor(Math.random() * 9)}K
+        <div className="pt-3">
+          <p className="truncate text-sm font-semibold text-white group-hover:text-red-300">{channel.name}</p>
+          <p className="mt-1 truncate text-xs text-zinc-400">{channel.category}</p>
         </div>
-      </div>
-      <h4 className="font-medium text-sm text-white group-hover:text-red-400 transition-colors truncate">{channel.name}</h4>
-      <p className="text-xs text-gray-500 mt-1 truncate">{channel.category || 'Transmissão ao Vivo'}</p>
-    </div>
+      </button>
+    </article>
   );
 }

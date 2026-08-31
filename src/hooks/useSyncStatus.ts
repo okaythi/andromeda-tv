@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { apiUrl } from '../api/client';
 
 export interface SyncState {
   isSyncing: boolean;
@@ -7,44 +8,58 @@ export interface SyncState {
   lastSuccess: string | null;
 }
 
-const BACKEND_URL = 'https://andromeda.nixlabs.tech';
+const INITIAL_STATUS: SyncState = {
+  isSyncing: false,
+  isEnriching: false,
+  lastError: null,
+  lastSuccess: null,
+};
 
-export function useSyncStatus() {
-  const [status, setStatus] = useState<SyncState>({
-    isSyncing: false,
-    isEnriching: false,
-    lastError: null,
-    lastSuccess: null
-  });
+export function useSyncStatus(): SyncState {
+  const [status, setStatus] = useState<SyncState>(INITIAL_STATUS);
 
   useEffect(() => {
-    let es: EventSource | null = null;
-    let retryTimeout: ReturnType<typeof setTimeout>;
+    let eventSource: EventSource | null = null;
+    let retryTimeout: ReturnType<typeof window.setTimeout> | null = null;
+    let disposed = false;
 
-    function connect() {
-      es = new EventSource(`${BACKEND_URL}/api/sync/status`);
-      
-      es.onmessage = (e) => {
+    const connect = () => {
+      if (disposed) return;
+      eventSource = new EventSource(apiUrl('/api/sync/status'));
+      eventSource.onmessage = (event) => {
         try {
-          const data = JSON.parse(e.data);
-          setStatus(data);
-        } catch (err) {
-          console.error("Failed to parse sync status", err);
+          const payload: unknown = JSON.parse(event.data);
+          if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return;
+          const record = payload as Record<string, unknown>;
+          if (
+            typeof record['isSyncing'] !== 'boolean'
+            || typeof record['isEnriching'] !== 'boolean'
+            || (record['lastError'] !== null && typeof record['lastError'] !== 'string')
+            || (record['lastSuccess'] !== null && typeof record['lastSuccess'] !== 'string')
+          ) return;
+
+          setStatus({
+            isSyncing: record['isSyncing'],
+            isEnriching: record['isEnriching'],
+            lastError: record['lastError'],
+            lastSuccess: record['lastSuccess'],
+          });
+        } catch {
+          // Keep the last known status when an invalid SSE message arrives.
         }
       };
-
-      es.onerror = () => {
-        es?.close();
-        // Retry connection after 5 seconds if SSE drops
-        retryTimeout = setTimeout(connect, 5000);
+      eventSource.onerror = () => {
+        eventSource?.close();
+        retryTimeout = window.setTimeout(connect, 5000);
       };
-    }
+    };
 
     connect();
 
     return () => {
-      es?.close();
-      clearTimeout(retryTimeout);
+      disposed = true;
+      eventSource?.close();
+      if (retryTimeout !== null) window.clearTimeout(retryTimeout);
     };
   }, []);
 

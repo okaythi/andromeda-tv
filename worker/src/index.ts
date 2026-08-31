@@ -3,6 +3,7 @@ import { cors } from 'hono/cors';
 import { Env } from './types';
 import { vodRouter } from './routes/vod.routes';
 import { liveRouter } from './routes/live.routes';
+import { searchRouter } from './routes/search.routes';
 import { SyncService } from './services/sync.service';
 import { TMDBService } from './services/tmdb.service';
 import { drizzle } from 'drizzle-orm/d1';
@@ -27,6 +28,7 @@ app.get('/api/sync', async (c) => {
 });
 app.route('/api/vod', vodRouter);
 app.route('/api/live', liveRouter);
+app.route('/api/search', searchRouter);
 
 // Cloudflare Worker export (fetch and scheduled cron)
 export default {

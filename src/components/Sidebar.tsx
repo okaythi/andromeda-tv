@@ -1,52 +1,51 @@
-
-import { Home, Compass, Users, User, Play } from 'lucide-react';
-import { DevTools } from './DevTools';
-
-export type ViewType = 'home' | 'channels';
+import { Bookmark, Home, Search, Tv, type LucideIcon } from 'lucide-react';
+import type { SidebarView } from '../navigation/types';
 
 interface SidebarProps {
-  currentView: ViewType;
-  onViewChange: (view: ViewType) => void;
+  currentView: SidebarView;
+  onViewChange: (view: SidebarView, trigger: HTMLElement) => void;
 }
+
+interface NavigationItem {
+  id: SidebarView;
+  label: string;
+  icon: LucideIcon;
+}
+
+const navigationItems: NavigationItem[] = [
+  { id: 'home', label: 'Início', icon: Home },
+  { id: 'channels', label: 'Canais', icon: Tv },
+  { id: 'search', label: 'Buscar', icon: Search },
+  { id: 'my-list', label: 'Minha lista', icon: Bookmark },
+];
 
 export function Sidebar({ currentView, onViewChange }: SidebarProps) {
   return (
-    <aside className="w-24 flex flex-col items-center py-8 bg-[#0A0A0A] z-20 border-r border-white/5 flex-shrink-0">
-      {/* Logo */}
-      <div className="mb-12">
-        <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-red-500 rounded-xl flex items-center justify-center transform rotate-45">
-          <Play size={20} className="text-white -rotate-45 ml-1" fill="currentColor" />
-        </div>
+    <aside className="z-40 flex w-[76px] flex-shrink-0 flex-col items-center border-r border-white/5 bg-[#0A0A0A] py-6 sm:w-24">
+      <div className="mb-10 flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-red-500 shadow-lg shadow-purple-900/30">
+        <span aria-hidden="true" className="text-lg font-black text-white">A</span>
+        <span className="sr-only">Andromeda TV</span>
       </div>
-
-      {/* Navigation */}
-      <nav className="flex flex-col gap-8 w-full px-4">
-        <button
-          onClick={() => onViewChange('home')}
-          className={`flex flex-col items-center gap-1.5 py-3 rounded-2xl transition-colors ${
-            currentView === 'home' ? 'text-white bg-white/10' : 'text-gray-500 hover:text-white'
-          }`}
-        >
-          <Home size={22} />
-          <span className="text-[10px] font-medium">Início</span>
-        </button>
-        <button className="flex flex-col items-center gap-1.5 text-gray-500 hover:text-white transition-colors">
-          <Compass size={22} />
-          <span className="text-[10px] font-medium">Descobrir</span>
-        </button>
-        <button className="flex flex-col items-center gap-1.5 text-gray-500 hover:text-white transition-colors">
-          <Users size={22} />
-          <span className="text-[10px] font-medium">Social</span>
-        </button>
-        <button className="flex flex-col items-center gap-1.5 text-gray-500 hover:text-white transition-colors mt-auto">
-          <User size={22} />
-          <span className="text-[10px] font-medium">Perfil</span>
-        </button>
+      <nav aria-label="Navegação principal" className="flex w-full flex-col gap-3 px-2 sm:gap-5 sm:px-4">
+        {navigationItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = currentView === item.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={(event) => onViewChange(item.id, event.currentTarget)}
+              aria-current={isActive ? 'page' : undefined}
+              className={`flex flex-col items-center gap-1 rounded-2xl px-2 py-3 text-[10px] font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${
+                isActive ? 'bg-white/10 text-white' : 'text-zinc-500 hover:bg-white/5 hover:text-white'
+              }`}
+            >
+              <Icon size={21} aria-hidden="true" />
+              <span className="hidden sm:block">{item.label}</span>
+            </button>
+          );
+        })}
       </nav>
-
-      <div className="mt-auto">
-        <DevTools />
-      </div>
     </aside>
   );
 }

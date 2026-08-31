@@ -1,40 +1,64 @@
-import { Search, Mic, Bell, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, RefreshCw, Search } from 'lucide-react';
+import { useState, type FormEvent } from 'react';
 import { useSyncStatus } from '../hooks/useSyncStatus';
 
-export function Header() {
+interface HeaderProps {
+  onSearch: (query: string, trigger: HTMLElement) => void;
+}
+
+export function Header({ onSearch }: HeaderProps) {
   const status = useSyncStatus();
+  const [query, setQuery] = useState('');
+  const statusLabel = status.lastError
+    ? `Erro de sincronização: ${status.lastError}`
+    : status.isSyncing
+      ? 'Sincronizando catálogos'
+      : status.isEnriching
+        ? 'Atualizando metadados'
+        : status.lastSuccess
+          ? 'Catálogo atualizado'
+          : 'Status do catálogo indisponível';
+
+  const submitSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const normalizedQuery = query.trim();
+    if (normalizedQuery.length >= 2) onSearch(normalizedQuery, event.currentTarget);
+  };
 
   return (
-    <header className="relative z-10 flex justify-between items-center px-12 py-8">
-      <div className="flex items-center gap-4">
-        <h1 className="text-2xl font-bold tracking-tight">Andromeda TV</h1>
-        
-        {/* Sync Indicator */}
-        <div className="flex items-center" title={status.lastError ? `Sync Error: ${status.lastError}` : (status.isSyncing ? 'Syncing catalogs...' : (status.isEnriching ? 'Enriching metadata...' : 'Up to date'))}>
+    <header className="sticky top-0 z-30 flex items-center justify-between gap-5 border-b border-white/5 bg-[#0A0A0A]/90 px-5 py-5 backdrop-blur-xl sm:px-12">
+      <div className="flex min-w-0 items-center gap-3">
+        <h1 className="truncate text-xl font-bold tracking-tight text-white sm:text-2xl">Andromeda TV</h1>
+        <span className="inline-flex" title={statusLabel} aria-label={statusLabel}>
           {status.lastError ? (
-            <AlertCircle size={16} className="text-red-500" />
+            <AlertCircle size={16} className="text-red-400" aria-hidden="true" />
           ) : status.isSyncing || status.isEnriching ? (
-            <RefreshCw size={16} className="text-blue-400 animate-spin" />
+            <RefreshCw size={16} className="animate-spin text-blue-300" aria-hidden="true" />
           ) : status.lastSuccess ? (
-            <CheckCircle2 size={16} className="text-green-500/50" />
+            <CheckCircle2 size={16} className="text-emerald-400" aria-hidden="true" />
           ) : null}
-        </div>
+        </span>
       </div>
-
-      <div className="flex items-center gap-6">
-        <div className="flex items-center bg-black/40 backdrop-blur-md border border-white/10 rounded-full px-4 py-2 w-80">
-          <input
-            type="text"
-            placeholder="Pesquisar"
-            className="bg-transparent border-none outline-none text-sm w-full placeholder:text-gray-400 text-white"
-          />
-          <Mic size={16} className="text-gray-400 mx-2 cursor-pointer hover:text-white" />
-          <Search size={16} className="text-gray-400 cursor-pointer hover:text-white" />
-        </div>
-        <button className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center text-gray-300 hover:text-white transition-colors">
-          <Bell size={18} />
+      <form onSubmit={submitSearch} className="flex w-full max-w-md items-center rounded-full border border-white/10 bg-black/40 px-4 py-2 focus-within:border-white/30">
+        <label htmlFor="catalog-search" className="sr-only">Pesquisar no catálogo</label>
+        <input
+          id="catalog-search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          type="search"
+          minLength={2}
+          placeholder="Pesquisar títulos e canais"
+          className="w-full bg-transparent text-sm text-white outline-none placeholder:text-zinc-500"
+        />
+        <button
+          type="submit"
+          aria-label="Pesquisar"
+          disabled={query.trim().length < 2}
+          className="ml-2 rounded-full p-1 text-zinc-300 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+        >
+          <Search size={18} aria-hidden="true" />
         </button>
-      </div>
+      </form>
     </header>
   );
 }

@@ -25,7 +25,7 @@ export class OnePlayParser {
             found.forEach(f => listUrls.add(f.trim()));
           }
         }
-      } catch (e) {
+      } catch {
         // ignore
       }
     }
@@ -64,7 +64,7 @@ export class OnePlayParser {
             }
           }
         }
-      } catch (e) {
+      } catch {
         // ignore
       }
     });
@@ -106,7 +106,7 @@ export class OnePlayParser {
             }
           }
         }
-      } catch (e) {}
+      } catch {}
 
       // Series
       try {
@@ -133,7 +133,7 @@ export class OnePlayParser {
             }
           }
         }
-      } catch (e) {}
+      } catch {}
     });
 
     await Promise.allSettled(fetchPromises);

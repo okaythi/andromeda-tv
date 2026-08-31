@@ -1,8 +1,10 @@
+import { sql } from 'drizzle-orm';
 import { DrizzleD1Database } from 'drizzle-orm/d1';
 import { movies, series, channels } from '../schema';
 import { TMDBService } from './tmdb.service';
 import { BrazucaParser } from './parsers/brazuca.parser';
 import { OnePlayParser } from './parsers/oneplay.parser';
+import { findBestTmdbMatch } from './tmdb-match.service';
 
 export class SyncService {
   private brazuca = new BrazucaParser();
@@ -71,29 +73,34 @@ export class SyncService {
     const allMovies = [...lancamentos, ...filmes, ...opMovies];
     console.log(`Processing ${allMovies.length} movies...`);
     for (const movie of allMovies) {
-      // Respect TMDB limits
-      await new Promise(resolve => setTimeout(resolve, 50));
-      const tmdbData = await this.tmdb.searchMovie(movie.name);
+      await new Promise<void>((resolve) => setTimeout(resolve, 50));
+      const searchResult = await this.tmdb.searchMovies(movie.name);
+      const match = searchResult.kind === 'success'
+        ? findBestTmdbMatch(movie.name, 'movie', searchResult.data)
+        : null;
+      const candidate = match?.candidate;
+      const tmdbId = searchResult.kind === 'success' ? match?.tmdbId ?? -1 : null;
 
       await this.db.insert(movies).values({
         id: movie.id,
         internalId: movie.internalId,
         title: movie.name,
-        overview: tmdbData?.overview || movie.info || '',
-        posterUrl: tmdbData?.poster_path ? `https://image.tmdb.org/t/p/w500${tmdbData.poster_path}` : movie.thumb || '',
-        backdropUrl: tmdbData?.backdrop_path ? `https://image.tmdb.org/t/p/w1280${tmdbData.backdrop_path}` : movie.fanart || '',
-        rating: tmdbData?.vote_average?.toString() || '0',
-        tmdbId: tmdbData?.id || null,
+        overview: candidate?.overview || movie.info || '',
+        posterUrl: candidate?.poster_path ? `https://image.tmdb.org/t/p/w500${candidate.poster_path}` : movie.thumb || '',
+        backdropUrl: candidate?.backdrop_path ? `https://image.tmdb.org/t/p/w1280${candidate.backdrop_path}` : movie.fanart || '',
+        rating: candidate?.vote_average?.toString() || '0',
+        tmdbId,
         category: movie.category || 'Movies'
       }).onConflictDoUpdate({
         target: movies.id,
         set: {
           internalId: movie.internalId,
           title: movie.name,
-          overview: tmdbData?.overview || movie.info || '',
-          posterUrl: tmdbData?.poster_path ? `https://image.tmdb.org/t/p/w500${tmdbData.poster_path}` : movie.thumb || '',
-          backdropUrl: tmdbData?.backdrop_path ? `https://image.tmdb.org/t/p/w1280${tmdbData.backdrop_path}` : movie.fanart || '',
-          rating: tmdbData?.vote_average?.toString() || '0'
+          overview: candidate?.overview || movie.info || '',
+          posterUrl: candidate?.poster_path ? `https://image.tmdb.org/t/p/w500${candidate.poster_path}` : movie.thumb || '',
+          backdropUrl: candidate?.backdrop_path ? `https://image.tmdb.org/t/p/w1280${candidate.backdrop_path}` : movie.fanart || '',
+          rating: candidate?.vote_average?.toString() || '0',
+          tmdbId: searchResult.kind === 'success' ? tmdbId : sql`tmdb_id`,
         }
       });
     }
@@ -101,30 +108,35 @@ export class SyncService {
     // 5. Insert Series (Animes + Doramas + BrazucaSeries + OnePlaySeries)
     const allSeries = [...animes, ...doramas, ...brazucaSeries, ...opSeries];
     console.log(`Processing ${allSeries.length} series...`);
-    for (const s of allSeries) {
-      // Respect TMDB limits
-      await new Promise(resolve => setTimeout(resolve, 50));
-      const tmdbData = await this.tmdb.searchMovie(s.name); // Reusing searchMovie for simplicity, ideally searchTv
+    for (const seriesTitle of allSeries) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 50));
+      const searchResult = await this.tmdb.searchSeriesCandidates(seriesTitle.name);
+      const match = searchResult.kind === 'success'
+        ? findBestTmdbMatch(seriesTitle.name, 'series', searchResult.data)
+        : null;
+      const candidate = match?.candidate;
+      const tmdbId = searchResult.kind === 'success' ? match?.tmdbId ?? -1 : null;
 
       await this.db.insert(series).values({
-        id: s.id,
-        internalId: s.internalId,
-        title: s.name,
-        overview: tmdbData?.overview || s.info || '',
-        posterUrl: tmdbData?.poster_path ? `https://image.tmdb.org/t/p/w500${tmdbData.poster_path}` : s.thumb || '',
-        backdropUrl: tmdbData?.backdrop_path ? `https://image.tmdb.org/t/p/w1280${tmdbData.backdrop_path}` : s.fanart || '',
-        rating: tmdbData?.vote_average?.toString() || '0',
-        tmdbId: tmdbData?.id || null,
-        category: s.category || 'Series'
+        id: seriesTitle.id,
+        internalId: seriesTitle.internalId,
+        title: seriesTitle.name,
+        overview: candidate?.overview || seriesTitle.info || '',
+        posterUrl: candidate?.poster_path ? `https://image.tmdb.org/t/p/w500${candidate.poster_path}` : seriesTitle.thumb || '',
+        backdropUrl: candidate?.backdrop_path ? `https://image.tmdb.org/t/p/w1280${candidate.backdrop_path}` : seriesTitle.fanart || '',
+        rating: candidate?.vote_average?.toString() || '0',
+        tmdbId,
+        category: seriesTitle.category || 'Series'
       }).onConflictDoUpdate({
         target: series.id,
         set: {
-          internalId: s.internalId,
-          title: s.name,
-          overview: tmdbData?.overview || s.info || '',
-          posterUrl: tmdbData?.poster_path ? `https://image.tmdb.org/t/p/w500${tmdbData.poster_path}` : s.thumb || '',
-          backdropUrl: tmdbData?.backdrop_path ? `https://image.tmdb.org/t/p/w1280${tmdbData.backdrop_path}` : s.fanart || '',
-          rating: tmdbData?.vote_average?.toString() || '0'
+          internalId: seriesTitle.internalId,
+          title: seriesTitle.name,
+          overview: candidate?.overview || seriesTitle.info || '',
+          posterUrl: candidate?.poster_path ? `https://image.tmdb.org/t/p/w500${candidate.poster_path}` : seriesTitle.thumb || '',
+          backdropUrl: candidate?.backdrop_path ? `https://image.tmdb.org/t/p/w1280${candidate.backdrop_path}` : seriesTitle.fanart || '',
+          rating: candidate?.vote_average?.toString() || '0',
+          tmdbId: searchResult.kind === 'success' ? tmdbId : sql`tmdb_id`,
         }
       });
     }
