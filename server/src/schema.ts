@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 export const movies = sqliteTable('movies', {
   id: text('id').primaryKey(),
@@ -44,3 +44,32 @@ export const events = sqliteTable('events', {
   status: text('status').notNull(),
   embeds: text('embeds').notNull(),
 });
+
+export const tmdbMetadataCache = sqliteTable(
+  'tmdb_metadata_cache',
+  {
+    cacheKey: text('cache_key').primaryKey(),
+    payload: text('payload').notNull(),
+    expiresAt: text('expires_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => ({
+    expiryIndex: index('idx_tmdb_metadata_cache_expiry').on(table.expiresAt),
+  }),
+);
+
+export const channelProgrammes = sqliteTable(
+  'channel_programmes',
+  {
+    id: text('id').primaryKey(),
+    channelId: text('channel_id').notNull(),
+    title: text('title').notNull(),
+    description: text('description').notNull().default(''),
+    posterUrl: text('poster_url'),
+    startsAt: text('starts_at').notNull(),
+    endsAt: text('ends_at').notNull(),
+  },
+  (table) => ({
+    windowIndex: index('idx_channel_programmes_window').on(table.channelId, table.startsAt, table.endsAt),
+  }),
+);

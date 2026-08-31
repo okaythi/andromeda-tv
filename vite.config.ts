@@ -1,18 +1,17 @@
-import react from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/vite'
-import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
+import { defineConfig } from 'vite';
 
-// https://vitejs.dev/config/
+const developmentApiTarget = process.env.VITE_DEV_API_PROXY_TARGET ?? 'http://127.0.0.1:3000';
+
 export default defineConfig({
   plugins: [tailwindcss(), react()],
-  // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
-  // 1. prevent vite from obscuring rust errors
   clearScreen: false,
-  // 2. tauri expects a fixed port, fail if that port is not available
   server: {
+    host: process.env.TAURI_DEV_HOST || '0.0.0.0',
+    allowedHosts: true,
     port: 1420,
     strictPort: true,
-    host: process.env.TAURI_DEV_HOST || false,
     hmr: process.env.TAURI_DEV_HOST
       ? {
           protocol: 'ws',
@@ -20,9 +19,14 @@ export default defineConfig({
           port: 1421,
         }
       : undefined,
+    proxy: {
+      '/api': {
+        target: developmentApiTarget,
+        changeOrigin: true,
+      },
+    },
     watch: {
-      // 3. tell vite to ignore watching `src-tauri`
       ignored: ['**/src-tauri/**'],
     },
   },
-})
+});

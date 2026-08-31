@@ -37,7 +37,7 @@ export function decodePoster(url: string | undefined | null): string {
   try {
     const dec = atob(clean);
     if (dec.startsWith('http')) return dec;
-  } catch (e) {
+  } catch {
     // Ignore error
   }
   return clean;

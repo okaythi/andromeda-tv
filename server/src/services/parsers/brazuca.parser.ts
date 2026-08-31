@@ -1,5 +1,5 @@
-import { z } from 'zod';
 import { XMLParser } from 'fast-xml-parser';
+import { z } from 'zod';
 
 export const ParsedItemSchema = z.object({
   id: z.string(),
@@ -22,16 +22,25 @@ export const ParsedChannelSchema = z.object({
 });
 export type ParsedChannel = z.infer<typeof ParsedChannelSchema>;
 
+type XmlRecord = Record<string, unknown>;
+
+function isXmlRecord(value: unknown): value is XmlRecord {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function textValue(value: unknown): string {
+  return typeof value === 'string' ? value : '';
+}
+
 export function cleanTitle(raw: string | undefined | null): string {
   if (!raw) return '';
-  let t = raw;
-  t = t.replace(/\[\/?COLOR[^\]]*\]/gi, '');
-  t = t.replace(/\[\/?B\]/gi, '');
-  t = t.replace(/\[\/?I\]/gi, '');
-  t = t.replace(/\[OnePlay\]/gi, '');
-  t = t.replace(/\[Brazuca\]/gi, '');
-  t = t.replace(/\|\|\|/g, '').replace(/\[CR\]/g, '\n').trim();
-  return t;
+  let title = raw;
+  title = title.replace(/\[\/?COLOR[^\]]*\]/gi, '');
+  title = title.replace(/\[\/?B\]/gi, '');
+  title = title.replace(/\[\/?I\]/gi, '');
+  title = title.replace(/\[OnePlay\]/gi, '');
+  title = title.replace(/\[Brazuca\]/gi, '');
+  return title.replace(/\|\|\|/g, '').replace(/\[CR\]/g, '\n').trim();
 }
 
 export function decodePoster(url: string | undefined | null): string {
@@ -39,164 +48,165 @@ export function decodePoster(url: string | undefined | null): string {
   const clean = url.trim();
   if (!clean || clean === '[object Object]') return '';
   if (clean.startsWith('http://') || clean.startsWith('https://')) return clean;
+
   try {
-    const dec = atob(clean);
-    if (dec.startsWith('http')) return dec;
+    const decoded = atob(clean);
+    return decoded.startsWith('http') ? decoded : clean;
   } catch {
-    // Ignore error
+    return clean;
   }
-  return clean;
 }
 
-function ensureArray(val: unknown): any[] {
-  if (!val) return [];
-  if (Array.isArray(val)) return val;
-  return [val];
+function ensureArray(value: unknown): unknown[] {
+  if (!value) return [];
+  return Array.isArray(value) ? value : [value];
 }
 
 export class BrazucaParser {
-  private parser = new XMLParser({
+  private readonly parser = new XMLParser({
     ignoreAttributes: true,
-    parseTagValue: false, // keep everything as strings
+    parseTagValue: false,
   });
 
   private classifyChannel(title: string): string {
-    const t = (title || '').toLowerCase();
-    if (['sportv', 'espn', 'futebol', 'ufc', 'tnt sports', 'premiere', 'combate', 'dazn', 'bandsports', 'nba'].some(k => t.includes(k))) return 'esportes';
-    if (['globo', 'sbt', 'record', 'band', 'redetv', 'cultura'].some(k => t.includes(k))) return 'abertos';
-    if (['filme', 'cine', 'hbo', 'telecine', 'axn', 'fox', 'megapix', 'paramount', 'warner', 'universal', 'sony'].some(k => t.includes(k))) return 'filmes';
-    if (['news', 'notícia', 'noticia', 'cnn', 'bandnews', 'record news', 'globonews', 'jovem pan'].some(k => t.includes(k))) return 'noticias';
-    if (['kids', 'cartoon', 'disney', 'nickelodeon', 'discovery kids', 'gloob', 'tooncast', 'nick jr'].some(k => t.includes(k))) return 'infantil';
-    if (['discovery', 'history', 'animal planet', 'nat geo', 'national geographic', 'curta', 'h2', 'doc'].some(k => t.includes(k))) return 'docs';
-    if (['multishow', 'viva', 'mtv', 'gnt', 'bis', 'comedy central', 'tlc', 'e!'].some(k => t.includes(k))) return 'variedades';
+    const normalizedTitle = title.toLocaleLowerCase('pt-BR');
+    if (['sportv', 'espn', 'futebol', 'ufc', 'tnt sports', 'premiere', 'combate', 'dazn', 'bandsports', 'nba'].some((keyword) => normalizedTitle.includes(keyword))) return 'esportes';
+    if (['globo', 'sbt', 'record', 'band', 'redetv', 'cultura'].some((keyword) => normalizedTitle.includes(keyword))) return 'abertos';
+    if (['filme', 'cine', 'hbo', 'telecine', 'axn', 'fox', 'megapix', 'paramount', 'warner', 'universal', 'sony'].some((keyword) => normalizedTitle.includes(keyword))) return 'filmes';
+    if (['news', 'notícia', 'noticia', 'cnn', 'bandnews', 'record news', 'globonews', 'jovem pan'].some((keyword) => normalizedTitle.includes(keyword))) return 'noticias';
+    if (['kids', 'cartoon', 'disney', 'nickelodeon', 'discovery kids', 'gloob', 'tooncast', 'nick jr'].some((keyword) => normalizedTitle.includes(keyword))) return 'infantil';
+    if (['discovery', 'history', 'animal planet', 'nat geo', 'national geographic', 'curta', 'h2', 'doc'].some((keyword) => normalizedTitle.includes(keyword))) return 'docs';
+    if (['multishow', 'viva', 'mtv', 'gnt', 'bis', 'comedy central', 'tlc', 'e!'].some((keyword) => normalizedTitle.includes(keyword))) return 'variedades';
     return 'outros';
   }
 
-  private extractItems(jsonObj: any): any[] {
-    const foundItems: any[] = [];
-    
-    function search(obj: any) {
-      if (!obj || typeof obj !== 'object') return;
-      
-      if (obj.item) foundItems.push(...ensureArray(obj.item));
-      if (obj.channel) {
-         const channels = ensureArray(obj.channel);
-         channels.forEach(c => {
-           if (c.item) foundItems.push(...ensureArray(c.item));
-           else foundItems.push(c);
-         });
+  private extractItems(jsonObject: unknown): XmlRecord[] {
+    const foundItems: XmlRecord[] = [];
+
+    const search = (value: unknown): void => {
+      if (!isXmlRecord(value)) return;
+
+      for (const item of ensureArray(value['item'])) {
+        if (isXmlRecord(item)) foundItems.push(item);
       }
-  
-      for (const key of Object.keys(obj)) {
-         if (key !== 'item' && key !== 'channel' && typeof obj[key] === 'object') {
-             search(obj[key]);
-         }
+
+      for (const channel of ensureArray(value['channel'])) {
+        if (!isXmlRecord(channel)) continue;
+        const channelItems = ensureArray(channel['item']);
+        if (channelItems.length > 0) {
+          for (const item of channelItems) {
+            if (isXmlRecord(item)) foundItems.push(item);
+          }
+        } else {
+          foundItems.push(channel);
+        }
       }
-    }
-    
-    search(jsonObj);
+
+      for (const [key, child] of Object.entries(value)) {
+        if (key !== 'item' && key !== 'channel') search(child);
+      }
+    };
+
+    search(jsonObject);
     return foundItems;
   }
 
   public async fetchChannels(url: string): Promise<ParsedChannel[]> {
-    const out: ParsedChannel[] = [];
+    const channels: ParsedChannel[] = [];
     try {
-      const resp = await fetch(url);
-      if (!resp.ok) return [];
-      const rawText = await resp.text();
-      const jsonObj = this.parser.parse(rawText);
-      const items = this.extractItems(jsonObj);
+      const response = await fetch(url);
+      if (!response.ok) return [];
+      const rawText = await response.text();
+      const parsedXml: unknown = this.parser.parse(rawText);
 
-      for (const item of items) {
-        const rawTitle = cleanTitle(item.title || item.name);
-        if (!rawTitle || rawTitle.startsWith("|||")) continue;
+      for (const item of this.extractItems(parsedXml)) {
+        const rawTitle = cleanTitle(textValue(item['title']) || textValue(item['name']));
+        if (!rawTitle || rawTitle.startsWith('|||')) continue;
 
-        const linkVal = typeof item.link === 'string' ? item.link.trim() : '';
-        const thumbVal = decodePoster(item.thumbnail || item.poster);
+        const linkValue = textValue(item['link']).trim();
+        const thumbnail = decodePoster(textValue(item['thumbnail']) || textValue(item['poster']));
+        const finalId = linkValue.startsWith('chresolver1=')
+          ? linkValue.replace('chresolver1=', '').split('#')[0] ?? ''
+          : linkValue;
 
-        let finalId = linkVal;
-        if (linkVal.startsWith('chresolver1=')) {
-          const parts = linkVal.replace('chresolver1=', '').split('#');
-          if (parts[0]) finalId = parts[0];
-        }
-
-        if (finalId) {
-          const parsed = ParsedChannelSchema.safeParse({
-            id: `br_${out.length + 1}`,
-            name: rawTitle,
-            thumb: thumbVal,
-            category: this.classifyChannel(rawTitle),
-            internalId: finalId
-          });
-          if (parsed.success) out.push(parsed.data);
-        }
+        if (!finalId) continue;
+        const candidate = ParsedChannelSchema.safeParse({
+          id: `br_${channels.length + 1}`,
+          name: rawTitle,
+          thumb: thumbnail,
+          category: this.classifyChannel(rawTitle),
+          internalId: finalId,
+        });
+        if (candidate.success) channels.push(candidate.data);
       }
-    } catch (e) {
-      console.error('[Channels] Error: ', e);
-      throw e;
+    } catch (error) {
+      console.error('[Channels] Error:', error);
+      throw error;
     }
-    return out;
+    return channels;
   }
 
-  public async fetchVod(url: string, category: string, contentType: string, idPrefix = 'vod_', startIndex = 0): Promise<ParsedItem[]> {
+  public async fetchVod(
+    url: string,
+    category: string,
+    contentType: string,
+    idPrefix = 'vod_',
+    startIndex = 0,
+  ): Promise<ParsedItem[]> {
     const itemsOut: ParsedItem[] = [];
     try {
-      const resp = await fetch(url);
-      if (!resp.ok) return [];
-      const rawText = await resp.text();
-      const jsonObj = this.parser.parse(rawText);
-      const items = this.extractItems(jsonObj);
-      
-      for (const item of items) {
-        const rawName = cleanTitle(item.name || item.title);
+      const response = await fetch(url);
+      if (!response.ok) return [];
+      const rawText = await response.text();
+      const parsedXml: unknown = this.parser.parse(rawText);
+
+      for (const item of this.extractItems(parsedXml)) {
+        const rawName = cleanTitle(textValue(item['name']) || textValue(item['title']));
         if (!rawName) continue;
 
-        const linkVal = typeof item.externallink === 'string' ? item.externallink.trim() : (typeof item.link === 'string' ? item.link.trim() : '');
-
-        const isPagination = linkVal.startsWith('http') && (
-          rawName.toUpperCase().includes('PRÓXIMA PÁGINA') ||
-          rawName.toUpperCase().includes('PRÃ“XIMA PÃ GINA') ||
-          rawName.toUpperCase().includes('PROXIMA PAGINA') ||
-          /pr[óoã\w]*xima\s+p[áaã\w]*g/i.test(rawName)
+        const linkValue = (textValue(item['externallink']) || textValue(item['link'])).trim();
+        const isPagination = linkValue.startsWith('http') && (
+          rawName.toUpperCase().includes('PRÓXIMA PÁGINA')
+          || rawName.toUpperCase().includes('PRÃ“XIMA PÃ GINA')
+          || rawName.toUpperCase().includes('PROXIMA PAGINA')
+          || /pr[óoã\w]*xima\s+p[áaã\w]*g/i.test(rawName)
         );
 
         if (isPagination) {
-          const nextItems = await this.fetchVod(linkVal, category, contentType, idPrefix, startIndex + itemsOut.length);
+          const nextItems = await this.fetchVod(linkValue, category, contentType, idPrefix, startIndex + itemsOut.length);
           itemsOut.push(...nextItems);
           continue;
         }
 
-        if (!linkVal || linkVal.toLowerCase() === 'here') continue;
+        if (!linkValue || linkValue.toLocaleLowerCase('pt-BR') === 'here') continue;
 
-        const thumbVal = decodePoster(item.thumbnail || item.poster || item.img);
-        const fanartVal = decodePoster(item.fanart || item.backdrop || item.cover) || thumbVal;
-        const infoVal = cleanTitle(item.info);
+        const thumbnail = decodePoster(
+          textValue(item['thumbnail']) || textValue(item['poster']) || textValue(item['img']),
+        );
+        const fanart = decodePoster(
+          textValue(item['fanart']) || textValue(item['backdrop']) || textValue(item['cover']),
+        ) || thumbnail;
+        const info = cleanTitle(textValue(item['info']));
+        const finalId = linkValue.startsWith('#')
+          ? linkValue.split('=')[1] ?? ''
+          : linkValue;
 
-        let finalId = linkVal;
-        if (linkVal.startsWith('#')) {
-          const parts = linkVal.split('=');
-          if (parts.length > 1 && parts[1]) {
-            finalId = parts[1];
-          }
-        }
-
-        if (finalId) {
-          const parsed = ParsedItemSchema.safeParse({
-            id: `${idPrefix}${startIndex + itemsOut.length + 1}`,
-            name: rawName,
-            thumb: thumbVal,
-            fanart: fanartVal,
-            category,
-            contentType,
-            info: infoVal,
-            internalId: finalId
-          });
-          if (parsed.success) itemsOut.push(parsed.data);
-        }
+        if (!finalId) continue;
+        const candidate = ParsedItemSchema.safeParse({
+          id: `${idPrefix}${startIndex + itemsOut.length + 1}`,
+          name: rawName,
+          thumb: thumbnail,
+          fanart,
+          category,
+          contentType,
+          info,
+          internalId: finalId,
+        });
+        if (candidate.success) itemsOut.push(candidate.data);
       }
-    } catch (e) {
-      console.error(`[VOD] Error downloading ${category}: `, e);
-      throw e;
+    } catch (error) {
+      console.error(`[VOD] Error downloading ${category}:`, error);
+      throw error;
     }
     return itemsOut;
   }

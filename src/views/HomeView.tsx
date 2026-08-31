@@ -1,78 +1,121 @@
-import { useMemo } from 'react';
-import type { Movie, LiveStream, HomeData } from '../api/backend';
-import { Header } from '../components/Header';
-import { HeroSection } from '../components/HeroSection';
-import { ChannelRow } from '../components/ChannelRow';
+import type { ChannelSummary, MediaType, TitleSummary } from '../../shared/catalog';
 import { CategoryRow } from '../components/CategoryRow';
+import { ChannelRow } from '../components/ChannelRow';
+import { EmptyState } from '../components/EmptyState';
+import { HeroSection } from '../components/HeroSection';
+import { LoadingGrid } from '../components/LoadingGrid';
+import { useChannelsQuery, useHomeQuery } from '../features/catalog/queries';
 
 interface HomeViewProps {
-  homeData: HomeData | null;
-  channels: LiveStream[];
-  onViewAllChannels: () => void;
-  onViewCategory: (title: string, categoryFilter: string | undefined, isSeries: boolean, initialMovies: Movie[]) => void;
+  onViewChannels: (trigger: HTMLElement) => void;
+  onViewCategory: (
+    title: string,
+    category: string | undefined,
+    mediaType: MediaType,
+    trigger: HTMLElement,
+  ) => void;
+  onOpenTitle: (title: TitleSummary, trigger: HTMLElement) => void;
+  onOpenChannel: (channel: ChannelSummary, trigger: HTMLElement) => void;
+  onWatchTitle: (title: TitleSummary, trigger: HTMLElement) => void;
 }
 
-export function HomeView({ homeData, channels, onViewAllChannels, onViewCategory }: HomeViewProps) {
-  // Safe defaults if still loading
-  const categories = useMemo(() => {
-    if (!homeData) return [];
-    
-    return [
-      { title: 'Filmes Populares', movies: homeData.popular_movies, categoryFilter: undefined, isSeries: false },
-      { title: 'Séries em Alta', movies: homeData.popular_series, categoryFilter: 'Séries', isSeries: true },
-      { title: 'Animes', movies: homeData.animes, categoryFilter: 'Animes', isSeries: true },
-      { title: 'Doramas', movies: homeData.doramas, categoryFilter: 'Doramas', isSeries: true }
-    ].filter(cat => cat.movies.length > 0);
-  }, [homeData]);
+export function HomeView({
+  onViewChannels,
+  onViewCategory,
+  onOpenTitle,
+  onOpenChannel,
+  onWatchTitle,
+}: HomeViewProps) {
+  const homeQuery = useHomeQuery();
+  const channelsQuery = useChannelsQuery();
+  const homeData = homeQuery.data;
+  const heroTitle = homeData?.popularMovies[0] ?? homeData?.popularSeries[0] ?? null;
 
-  // Pick the first movie with a real TMDB backdrop as hero
-  const heroMovie = useMemo(() => {
-    const candidates = homeData?.popular_movies ?? [];
-    const enriched = candidates.find(m => 
-      m.backdropUrl?.includes('image.tmdb.org') && m.internalId !== 'here'
+  if (homeQuery.isPending) {
+    return (
+      <div className="pb-20">
+        <div className="h-[510px] animate-pulse border-b border-white/5 bg-gradient-to-br from-zinc-800 via-zinc-900 to-black" />
+        <div className="space-y-12 px-5 pt-10 sm:px-12">
+          <LoadingGrid count={5} aspect="landscape" />
+          <LoadingGrid count={6} />
+        </div>
+      </div>
     );
-    return enriched ?? candidates.find(m => m.internalId !== 'here') ?? {
-      id: 'mock',
-      internalId: 'mock',
-      title: 'Sons em Órbita',
-      overview: 'Uma série de ficção científica envolvente.',
-      posterUrl: 'https://images.unsplash.com/photo-1618172193622-ae2d025f4032?q=80&w=400&auto=format&fit=crop',
-      backdropUrl: 'https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?q=80&w=2072&auto=format&fit=crop',
-      category: 'Ficção Científica',
-      rating: '8.0',
-      tmdbId: null
-    } as Movie;
-  }, [homeData]);
+  }
 
-  const displayChannels = channels.length > 0 ? channels : Array(12).fill({
-    id: 'mock',
-    internalId: 'mock',
-    name: 'Ao Vivo em Alta',
-    logoUrl: 'https://images.unsplash.com/photo-1541873676-a18131494184?q=80&w=600&auto=format&fit=crop',
-    category: 'TV',
-    source: 'Mock',
-    links: '[]'
-  }) as LiveStream[];
+  if (homeQuery.isError || !homeData) {
+    return (
+      <div className="px-5 py-16 sm:px-12">
+        <EmptyState
+          title="Não foi possível carregar o catálogo"
+          description="Verifique sua conexão e tente novamente."
+          action={(
+            <button
+              type="button"
+              onClick={() => void homeQuery.refetch()}
+              className="rounded-xl bg-white px-5 py-3 font-semibold text-black transition hover:bg-zinc-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            >
+              Tentar novamente
+            </button>
+          )}
+        />
+      </div>
+    );
+  }
+
+  const categories = [
+    { title: 'Filmes populares', titles: homeData.popularMovies, category: undefined, mediaType: 'movie' as const },
+    { title: 'Séries em alta', titles: homeData.popularSeries, category: 'Séries', mediaType: 'series' as const },
+    { title: 'Animes', titles: homeData.animes, category: 'Animes', mediaType: 'series' as const },
+    { title: 'Doramas', titles: homeData.doramas, category: 'Doramas', mediaType: 'series' as const },
+  ];
+
+  const visibleCategories = categories.filter((category) => category.titles.length > 0);
 
   return (
-    <>
-      <Header />
-      <HeroSection movie={heroMovie} />
+    <div className="pb-20">
+      {heroTitle ? (
+        <HeroSection title={heroTitle} onOpen={onOpenTitle} onWatch={onWatchTitle} />
+      ) : (
+        <div className="px-5 py-16 sm:px-12">
+          <EmptyState
+            title="Ainda não há títulos em destaque"
+            description="Quando seu catálogo estiver sincronizado, os destaques aparecerão aqui."
+          />
+        </div>
+      )}
 
-      {/* Content Rows */}
-      <div className="relative z-10 px-12 pb-24 space-y-12 bg-gradient-to-b from-transparent to-[#0A0A0A]">
-        <ChannelRow channels={displayChannels} onViewMore={onViewAllChannels} />
-        
-        {categories.map((cat) => (
-          // Exclude the hero movie from the row if it's there
-          <CategoryRow 
-            key={cat.title} 
-            title={cat.title} 
-            movies={cat.movies.filter(m => m.id !== heroMovie.id)} 
-            onViewMore={() => onViewCategory(cat.title, cat.categoryFilter, cat.isSeries, cat.movies)}
+      <div className="space-y-12 px-5 pt-10 sm:px-12">
+        {channelsQuery.isPending ? (
+          <LoadingGrid count={5} aspect="landscape" />
+        ) : channelsQuery.isError ? (
+          <EmptyState
+            title="Não foi possível carregar os canais"
+            description="Tente atualizar o catálogo de canais."
+            action={(
+              <button
+                type="button"
+                onClick={() => void channelsQuery.refetch()}
+                className="rounded-xl border border-white/20 px-5 py-3 font-semibold text-white transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+              >
+                Tentar novamente
+              </button>
+            )}
+          />
+        ) : channelsQuery.data && channelsQuery.data.length > 0 ? (
+          <ChannelRow channels={channelsQuery.data} onViewMore={onViewChannels} onOpenChannel={onOpenChannel} />
+        ) : null}
+
+        {visibleCategories.map((category) => (
+          <CategoryRow
+            key={category.title}
+            title={category.title}
+            titles={category.titles.filter((title) => title.id !== heroTitle?.id)}
+            onViewMore={(trigger) => onViewCategory(category.title, category.category, category.mediaType, trigger)}
+            onOpenTitle={onOpenTitle}
           />
         ))}
       </div>
-    </>
+    </div>
   );
 }

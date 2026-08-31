@@ -25,7 +25,7 @@ export class OnePlayParser {
             found.forEach(f => listUrls.add(f.trim()));
           }
         }
-      } catch (e) {
+      } catch {
         // Continue trying other master URLs
       }
     }
@@ -64,7 +64,7 @@ export class OnePlayParser {
             }
           }
         }
-      } catch (e) {
+      } catch {
         // Safe to ignore individual dead servers
       }
     });

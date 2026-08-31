@@ -1,65 +1,113 @@
-import { useEffect, useState } from 'react';
-import { fetchHome, fetchChannels, type LiveStream, type HomeData, type Movie } from './api/backend';
-import { Sidebar, type ViewType } from './components/Sidebar';
-import { HomeView } from './views/HomeView';
-import { ChannelsGrid } from './views/ChannelsGrid';
-import { MoviesGrid } from './views/MoviesGrid';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { ChannelSummary, MediaType, TitleSummary } from '../shared/catalog';
+import { Header } from './components/Header';
+import { PlaybackAvailabilityDialog } from './components/detail/PlaybackAvailabilityDialog';
+import { Sidebar } from './components/Sidebar';
+import { FavoritesProvider } from './features/favorites/FavoritesContext';
+import { useBackNavigation } from './hooks/useBackNavigation';
+import { AppViewRenderer } from './navigation/AppViewRenderer';
+import { documentTitleFor } from './navigation/document-title';
+import type { SidebarView } from './navigation/types';
+import { useAppNavigation } from './navigation/useAppNavigation';
+import type { ViewActions } from './navigation/view-actions';
 
-export type AppView = 
-  | { type: 'home' } 
-  | { type: 'channels' }
-  | { type: 'category'; title: string; categoryFilter: string | undefined; isSeries: boolean; initialMovies: Movie[] };
+interface PlaybackRequest {
+  title: string;
+  focusTarget: HTMLElement;
+}
 
-function App() {
-  const [homeData, setHomeData] = useState<HomeData | null>(null);
-  const [channels, setChannels] = useState<LiveStream[]>([]);
-  const [currentView, setCurrentView] = useState<AppView>({ type: 'home' });
+function sidebarViewFor(viewType: string): SidebarView {
+  if (viewType === 'channels' || viewType === 'channel') return 'channels';
+  if (viewType === 'search') return 'search';
+  if (viewType === 'my-list') return 'my-list';
+  return 'home';
+}
 
-  useEffect(() => {
-    fetchHome().then(setHomeData);
-    fetchChannels().then(setChannels);
+function AppContent() {
+  const { currentView, canGoBack, navigate, resetTo, back } = useAppNavigation();
+  const [playbackRequest, setPlaybackRequest] = useState<PlaybackRequest | null>(null);
+
+  const handleBack = useCallback(() => {
+    if (canGoBack) {
+      back();
+      return;
+    }
+    resetTo('home');
+  }, [back, canGoBack, resetTo]);
+
+  const openTitle = useCallback((title: TitleSummary, trigger: HTMLElement) => {
+    navigate({ type: 'title', title }, trigger);
+  }, [navigate]);
+
+  const openChannel = useCallback((channel: ChannelSummary, trigger: HTMLElement) => {
+    navigate({ type: 'channel', channel }, trigger);
+  }, [navigate]);
+
+  const openCategory = useCallback((
+    title: string,
+    category: string | undefined,
+    mediaType: MediaType,
+    trigger: HTMLElement,
+  ) => {
+    navigate({ type: 'category', title, category, mediaType }, trigger);
+  }, [navigate]);
+
+  const openChannels = useCallback((trigger: HTMLElement) => {
+    navigate({ type: 'channels' }, trigger);
+  }, [navigate]);
+
+  const openSearch = useCallback((query: string, trigger: HTMLElement) => {
+    navigate({ type: 'search', query }, trigger);
+  }, [navigate]);
+
+  const requestPlayback = useCallback((title: string, trigger: HTMLElement) => {
+    setPlaybackRequest({ title, focusTarget: trigger });
   }, []);
 
-  const handleSidebarChange = (view: ViewType) => {
-    if (view === 'channels') setCurrentView({ type: 'channels' });
-    else setCurrentView({ type: 'home' });
-  };
+  const closePlaybackRequest = useCallback(() => {
+    const focusTarget = playbackRequest?.focusTarget ?? null;
+    setPlaybackRequest(null);
+    window.requestAnimationFrame(() => {
+      if (focusTarget?.isConnected) focusTarget.focus();
+    });
+  }, [playbackRequest]);
+
+  const viewActions = useMemo<ViewActions>(() => ({
+    onBack: handleBack,
+    onOpenTitle: openTitle,
+    onOpenChannel: openChannel,
+    onOpenCategory: openCategory,
+    onOpenChannels: openChannels,
+    onRequestPlayback: requestPlayback,
+  }), [handleBack, openCategory, openChannel, openChannels, openTitle, requestPlayback]);
+
+  useBackNavigation(handleBack, canGoBack && playbackRequest === null);
+
+  useEffect(() => {
+    document.title = documentTitleFor(currentView);
+  }, [currentView]);
 
   return (
-    <div className="flex h-full bg-[#0A0A0A] text-white overflow-hidden font-sans">
-      <Sidebar 
-        currentView={currentView.type === 'channels' ? 'channels' : 'home'} 
-        onViewChange={handleSidebarChange} 
-      />
-
-      <main className="flex-1 relative overflow-hidden">
-        <div className={`absolute inset-0 overflow-y-auto hide-scrollbar ${currentView.type === 'home' ? 'block' : 'hidden'}`}>
-          <HomeView
-            homeData={homeData}
-            channels={channels}
-            onViewAllChannels={() => setCurrentView({ type: 'channels' })}
-            onViewCategory={(title, categoryFilter, isSeries, initialMovies) => setCurrentView({ type: 'category', title, categoryFilter, isSeries, initialMovies })}
-          />
-        </div>
-        <div className={`absolute inset-0 overflow-y-auto hide-scrollbar ${currentView.type === 'channels' ? 'block' : 'hidden'}`}>
-          <ChannelsGrid
-            channels={channels}
-            onBack={() => setCurrentView({ type: 'home' })}
-          />
-        </div>
-        <div className={`absolute inset-0 overflow-y-auto hide-scrollbar ${currentView.type === 'category' ? 'block' : 'hidden'}`}>
-          {currentView.type === 'category' && (
-            <MoviesGrid
-              title={currentView.title}
-              categoryFilter={currentView.categoryFilter}
-              isSeries={currentView.isSeries}
-              initialMovies={currentView.initialMovies}
-              onBack={() => setCurrentView({ type: 'home' })}
-            />
-          )}
+    <div className="flex h-dvh overflow-hidden bg-[#0A0A0A] font-sans text-white">
+      <Sidebar currentView={sidebarViewFor(currentView.type)} onViewChange={resetTo} />
+      <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
+        <Header onSearch={openSearch} />
+        <div className="flex-1 overflow-y-auto hide-scrollbar">
+          <AppViewRenderer view={currentView} actions={viewActions} />
         </div>
       </main>
+      {playbackRequest && (
+        <PlaybackAvailabilityDialog title={playbackRequest.title} onClose={closePlaybackRequest} />
+      )}
     </div>
+  );
+}
+
+function App() {
+  return (
+    <FavoritesProvider>
+      <AppContent />
+    </FavoritesProvider>
   );
 }
 

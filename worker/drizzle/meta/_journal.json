@@ -8,6 +8,13 @@
       "when": 1787811126941,
       "tag": "0000_groovy_purple_man",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1788205394091,
+      "tag": "0001_title_metadata_and_guide",
+      "breakpoints": true
     }
   ]
 }
